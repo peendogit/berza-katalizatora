@@ -909,38 +909,65 @@ document.addEventListener('click', e => {
 // ═══════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════
-function doLogin() {
+// ─── API Helper ───────────────────────────────────────────
+async function api(method, path, body) {
+  const token = localStorage.getItem('token');
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška');
+  return data;
+}
+
+async function doLogin() {
   const email = document.getElementById('in-email').value.trim().toLowerCase();
   const pass  = document.getElementById('in-pass').value;
   if (!email || !pass) { toast('Unesite email i lozinku', 'err'); return; }
-  const u = USERS.find(x => x.email === email && x.pass === pass);
-  if (!u) { toast('❌ Pogrešan email ili lozinka', 'err'); return; }
-  loginUser(u);
+  try {
+    const btn = document.querySelector('#page-login .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = 'Prijava...'; }
+    const { user, token } = await api('POST', '/auth/login', { email, password: pass });
+    localStorage.setItem('token', token);
+    loginUser(user);
+  } catch (err) {
+    toast('❌ ' + err.message, 'err');
+  } finally {
+    const btn = document.querySelector('#page-login .btn-primary');
+    if (btn) { btn.disabled = false; btn.textContent = 'Prijavi se'; }
+  }
 }
 
-function doRegister() {
+async function doRegister() {
   const name  = document.getElementById('reg-name').value.trim();
   const city  = document.getElementById('reg-city').value.trim();
-  const cEl   = document.getElementById('reg-country');
-  const ctryVal = cEl.value; // 'ba' ili 'rs'
-  const ctry = ctryVal === 'rs' ? 'Srbija' : 'Bosna i Hercegovina';
   const addr  = document.getElementById('reg-addr').value.trim();
   const tel   = document.getElementById('reg-tel').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
   const pass  = document.getElementById('reg-pass').value;
   if (!name||!city||!tel||!email||!pass) { toast('Popunite sva obavezna polja', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
-  if (USERS.find(u => u.email === email)) { toast('Email već postoji', 'err'); return; }
-  const status = selRole === 'buyer' ? 'pending' : 'approved';
-  const u = {id:'u'+Date.now(), email, pass, name, city:city, addr, tel, role:selRole, entity:selRole==='buyer'?selEntity:'', status, premium:selRole==='buyer'};
-  USERS.push(u);
-  if (selRole==='buyer') BUYER_ADDR[u.id] = {name:u.name, addr:u.addr||u.city, city:u.city, tel:u.tel};
-  loginUser(u);
+  try {
+    const btn = document.getElementById('reg-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
+    localStorage.setItem('token', token);
+    loginUser(user);
+    if (user.status === 'pending') toast('✅ Registracija uspješna! Čekate odobrenje admina.', 'ok');
+  } catch (err) {
+    toast('❌ ' + err.message, 'err');
+  } finally {
+    const btn = document.getElementById('reg-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Registruj se'; }
+  }
 }
 
 function loginUser(u) {
   CU = u;
-  expireOld(); // provjeri istek premiuma odmah na loginu
+  expireOld();
   // Header
   document.getElementById('hdr-guest').style.display = 'none';
   const hu = document.getElementById('hdr-user');
@@ -957,10 +984,23 @@ function loginUser(u) {
 
 function doLogout() {
   CU = null; uploads = [];
+  localStorage.removeItem('token');
   document.getElementById('hdr-guest').style.display = '';
   document.getElementById('hdr-user').style.display  = 'none';
   document.getElementById('fab').classList.remove('show');
   showPage('page-hero');
+}
+
+// Auto-login ako postoji token
+async function tryAutoLogin() {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const user = await api('GET', '/auth/me');
+    loginUser(user);
+  } catch {
+    localStorage.removeItem('token');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2433,9 +2473,10 @@ function toast(msg,type='') {
 }
 
 // INIT
-showPage('page-hero');
-history.replaceState({page:'page-hero'}, '');
 initAC('reg-city', 'reg-country');
+tryAutoLogin().then(() => {
+  if (!CU) { showPage('page-hero'); history.replaceState({page:'page-hero'}, ''); }
+});
 </script>
 </body>
 </html>
