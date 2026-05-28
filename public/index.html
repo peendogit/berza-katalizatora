@@ -398,8 +398,19 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
   <div class="logo" onclick="goHome()">BERZA <em>KATALIZATORA</em></div>
   <div class="hdr-r" style="gap:8px">
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Promijeni temu">🌙</button>
-    <div id="hdr-guest">
-      <button class="btn btn-primary" onclick="showLoginPage()">Prijava</button>
+    <div id="hdr-guest" style="position:relative">
+      <button class="btn btn-primary" onclick="toggleDevMenu()">🔧 Login ▾</button>
+      <div id="dev-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--panel);border:1px solid var(--border2);border-radius:8px;overflow:hidden;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:300">
+        <div style="padding:7px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border)">Brzi login (dev)</div>
+        <div class="dev-opt" onclick="devLogin('prodavac@test.ba')">🚗 Prodavač (Mirko)</div>
+        <div class="dev-opt" onclick="devLogin('otkupljivac@test.ba')">🏭 AutoKat (approved)</div>
+        <div class="dev-opt" onclick="devLogin('pgm@example.ba')">🏭 PGM Reciklaža</div>
+        <div class="dev-opt" onclick="devLogin('novi@test.ba')">⏳ KatOtkup (pending)</div>
+        <div class="dev-opt" onclick="devLogin('admin@berza.ba')" style="border-top:1px solid var(--border)">👑 Admin</div>
+        <div style="padding:6px 10px;border-top:1px solid var(--border)">
+          <button class="btn btn-ghost btn-xs" style="width:100%" onclick="toggleDevMenu();showLoginPage()">Pravi login →</button>
+        </div>
+      </div>
     </div>
     <div id="hdr-user" style="display:none;align-items:center;gap:8px">
       <div class="uc" onclick="openProfil()">
@@ -432,13 +443,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-align:center;margin-bottom:4px">BERZA <span style="color:var(--orange)">KATALIZATORA</span></div>
       <div style="text-align:center;font-size:13px;color:var(--muted2);margin-bottom:22px">Prijavite se</div>
       <div class="fg"><label>Email</label><input id="in-email" type="email" placeholder="vas@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <div class="fg">
-        <label>Lozinka</label>
-        <div style="position:relative">
-          <input id="in-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding-right:44px">
-          <button type="button" onclick="togglePassVis('in-pass','eye-login')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;color:var(--muted);line-height:1" id="eye-login">👁</button>
-        </div>
-      </div>
+      <div class="fg"><label>Lozinka</label><input id="in-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.9">Demo: <b>prodavac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>otkupljivac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>admin@berza.ba</b> / admin</p>
       <button class="btn btn-primary btn-block" onclick="doLogin()">Prijavi se</button>
       <div class="divider"></div>
       <div style="text-align:center;font-size:13px;color:var(--muted2)">Nemate nalog? <button onclick="showRegisterPage()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;font-family:Barlow,sans-serif">Registrujte se →</button></div>
@@ -492,12 +498,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
         <div class="fg"><label>Telefon *</label><input id="reg-tel" placeholder="+387 61 ..."></div>
       </div>
       <div class="fg"><label>Email *</label><input id="reg-email" type="email" placeholder="vas@email.com"></div>
-      <div class="fg"><label>Lozinka *</label>
-        <div style="position:relative">
-          <input id="reg-pass" type="password" placeholder="Min. 6 znakova" style="width:100%;padding-right:44px">
-          <button type="button" onclick="togglePassVis('reg-pass','eye-reg')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;color:var(--muted);line-height:1" id="eye-reg">👁</button>
-        </div>
-      </div>
+      <div class="fg"><label>Lozinka *</label><input id="reg-pass" type="password" placeholder="Min. 6 znakova"></div>
 
       <button class="btn btn-primary btn-block" id="reg-btn" onclick="doRegister()">Registruj se</button>
       <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Već imate nalog? <button onclick="showLoginPage()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:12px;cursor:pointer;font-family:Barlow,sans-serif">Prijavite se →</button></div>
@@ -845,7 +846,7 @@ const getU     = id => USERS.find(u => u.id === id);
 const getOwner = l  => USERS.find(u => u.id === l.uid) || {name:'Nepoznat', city:'—', tel:'—', id:'x'};
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
-const avCol    = id => avColors[(id||'x').charCodeAt((id||'x').length-1) % avColors.length];
+const avCol    = id => { const s = String(id||'x'); return avColors[s.charCodeAt(s.length-1) % avColors.length]; };
 const now8     = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); };
 
@@ -915,23 +916,11 @@ async function api(method, path, body) {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }
   };
-  if (body) opts.body = JSON.stringify(body);
+  if (body && method !== 'GET') opts.body = JSON.stringify(body);
   const res = await fetch('/api' + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Greška');
   return data;
-}
-
-function togglePassVis(inputId, btnId) {
-  const inp = document.getElementById(inputId);
-  const btn = document.getElementById(btnId);
-  if (inp.type === 'password') {
-    inp.type = 'text';
-    if (btn) btn.style.opacity = '1';
-  } else {
-    inp.type = 'password';
-    if (btn) btn.style.opacity = '0.45';
-  }
 }
 
 async function doLogin() {
@@ -1177,20 +1166,20 @@ async function renderMyListings() {
       ponude: []
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
-  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status!=='sold');
+  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
   const el = document.getElementById('s-oglasi');
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
   }
   el.innerHTML = mine.map(l => {
-    const pend = l.ponude.filter(p => p.status==='pending').length;
+    const pend = parseInt(l.ponuda_count) || 0;
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
     const thumb = l.thumb ? `<img src="${l.thumb}">` : '🔧';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
-    const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const expW = pend===0 && rem<=3 && rem>0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
         <div class="s-oglas-thumb">${thumb}</div>
@@ -1199,7 +1188,7 @@ async function renderMyListings() {
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
             📅 Objavljeno: ${fmtDate(l.createdAt)} &nbsp;·&nbsp;
-            ${l.ponude.length
+            ${pend
               ? '✅ Ima ponuda — oglas ne ističe'
               : rem > 0
                 ? (rem <= 3
@@ -1208,7 +1197,7 @@ async function renderMyListings() {
                 : '<span style="color:var(--red)">Istekao</span>'
             }
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">${badge}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${badge} ${expW}</div>
         </div>
       </div>
       <div class="ponude-panel" id="pp-${l.id}"></div>
@@ -1959,9 +1948,13 @@ function openPremiumInfo() { document.getElementById('ov-premium').classList.add
 
 async function admSetPremium(uid, val) {
   try {
-    if (val) await api('PUT', '/admin/users/'+uid+'/premium', { months: 12 });
-    else await api('PUT', '/admin/users/'+uid+'/reject'); // reuse reject for remove premium hack
-    toast(val ? '⭐ Premium dodijeljen' : 'Premium uklonjen', val ? 'ok' : '');
+    if (val) {
+      await api('PUT', '/admin/users/'+uid+'/premium', { months: 12 });
+      toast('⭐ Premium dodijeljen', 'ok');
+    } else {
+      await api('DELETE', '/admin/users/'+uid+'/premium');
+      toast('Premium uklonjen', '');
+    }
     renderAdminUsers();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
