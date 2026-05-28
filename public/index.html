@@ -1093,25 +1093,42 @@ function rmFile(i) {
 // ═══════════════════════════════════════════════════════
 // SUBMIT LISTING
 // ═══════════════════════════════════════════════════════
-function submitListing() {
+async function submitListing() {
   const marka = document.getElementById('f-marka').value.trim();
   if (!marka) { toast('Unesite marku vozila', 'err'); return; }
-  LISTINGS.unshift({
-    id: Date.now(), uid: CU.id,
-    broj:   document.getElementById('f-broj').value.trim(),
-    marka,  model:  document.getElementById('f-model').value.trim(),
-    god:    document.getElementById('f-god').value.trim(),
-    stanje: document.getElementById('f-stanje').value,
-    nap:    document.getElementById('f-nap').value.trim(),
-    thumb:  uploads.length ? URL.createObjectURL(uploads[0]) : null,
-    status: 'active', ponude: [], createdAt: Date.now()
-  });
-  uploads = [];
-  document.getElementById('prev-grid').innerHTML = '';
-  ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
-  closeOv('ov-novi');
-  toast('✅ Oglas objavljen!', 'ok');
-  sTab('oglasi');
+  try {
+    const btn = document.getElementById('novi-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
+    let imageUrls = [];
+    if (uploads.length > 0) {
+      const fd = new FormData();
+      uploads.forEach(f => fd.append('images', f));
+      const token = localStorage.getItem('token');
+      const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+      const upData = await upRes.json();
+      if (upData.urls) imageUrls = upData.urls;
+    }
+    await api('POST', '/listings', {
+      broj:   document.getElementById('f-broj').value.trim(),
+      marka,
+      model:  document.getElementById('f-model').value.trim(),
+      god:    document.getElementById('f-god').value.trim(),
+      stanje: document.getElementById('f-stanje').value,
+      nap:    document.getElementById('f-nap').value.trim(),
+      images: imageUrls
+    });
+    uploads = [];
+    document.getElementById('prev-grid').innerHTML = '';
+    ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
+    closeOv('ov-novi');
+    toast('✅ Oglas objavljen!', 'ok');
+    sTab('oglasi');
+  } catch(err) {
+    toast('❌ ' + err.message, 'err');
+  } finally {
+    const btn = document.getElementById('novi-submit-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Objavi oglas'; }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1139,9 +1156,16 @@ function expireOld() {
 // ═══════════════════════════════════════════════════════
 // SELLER: MY LISTINGS
 // ═══════════════════════════════════════════════════════
-function renderMyListings() {
-  expireOld();
+async function renderMyListings() {
   updateOglasiBadge();
+  try {
+    const data = await api('GET', '/listings');
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(),
+      ponude: []
+    }));
+  } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
   const mine = LISTINGS.filter(l => l.uid===CU.id && l.status!=='sold');
   const el = document.getElementById('s-oglasi');
   if (!mine.length) {
@@ -1318,9 +1342,20 @@ function renderBuyerPage() {
   if (!pend) bTab('oglasi');
 }
 
-function renderBuyerListings() {
-  expireOld();
+async function renderBuyerListings() {
   const el = document.getElementById('b-oglasi');
+  try {
+    const data = await api('GET', '/listings');
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(),
+      ponude: l.my_ponude || []
+    }));
+    // Sync my ponude
+    allMyPonude[CU.id] = LISTINGS.flatMap(l =>
+      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, expiresAt: new Date(p.expires_at).getTime() }))
+    );
+  } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
   const sentLids = getMyPonude().map(p => p.lid);
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !sentLids.includes(l.id));
   const active = sortListings(activeRaw);
@@ -1422,27 +1457,24 @@ function ponudaBack() {
   document.getElementById('ov-ponuda').classList.add('on');
   document.getElementById('pon-step1').style.display='';
 }
-function ponudaConfirm() {
+async function ponudaConfirm() {
   if (!canBid()) {
-    closeOv('ov-ponuda');
-  closeOv('ov-confirm-ponuda');
-    toast('❌ Dnevni limit od '+FREE_DAILY_LIMIT+' ponuda je dostignut. Nadogradite na Premium za neograničene ponude.', 'err');
+    closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
+    toast('❌ Dnevni limit od '+FREE_DAILY_LIMIT+' ponuda je dostignut.', 'err');
     return;
   }
   const c=parseFloat(document.getElementById('pon-iznos').value);
-  const msg='';
   const dani=parseInt((document.getElementById('pon-dani')||{value:'3'}).value)||3;
   if (!c||!_ponudaLid) return;
-  const l=LISTINGS.find(x=>x.id===_ponudaLid); if(!l) return;
-  const pid='p'+Date.now();
-  const expiresAt=Date.now()+dani*86400000;
-  l.ponude.push({id:pid, buyerId:CU.id, cijena:c, msg, time:now8(), dani, expiresAt, status:'pending'});
-  addMyPonuda({lid:_ponudaLid, pid, cijena:c, dani, expiresAt});
-  incrementBidsToday(CU.id);
-  closeOv('ov-ponuda');
-  closeOv('ov-confirm-ponuda');
-  renderBuyerListings();
-  toast('✅ Ponuda '+c+' KM poslana!','ok');
+  try {
+    await api('POST', '/ponude', { listing_id: _ponudaLid, cijena: c, dani });
+    incrementBidsToday(CU.id);
+    closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
+    renderBuyerListings();
+    toast('✅ Ponuda '+c+' KM poslana!','ok');
+  } catch(err) {
+    toast('❌ ' + err.message, 'err');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1772,8 +1804,12 @@ function setAdminFilter(f) {
   renderAdminUsers();
 }
 
-function renderAdminUsers() {
+async function renderAdminUsers() {
   const q=(document.getElementById('admin-search')||{value:''}).value.trim().toLowerCase();
+  try {
+    const data = await api('GET', '/admin/users');
+    USERS = data;
+  } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
   let list=USERS.filter(u=>u.role!=='admin'&&(adminFilter==='all'||u.role===adminFilter));
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
   const pend=list.filter(u=>u.status==='pending');
@@ -1851,21 +1887,29 @@ document.addEventListener('click', e => {
 
 function openPremiumInfo() { document.getElementById('ov-premium').classList.add('on'); }
 
-function admSetPremium(uid, val) {
-  const u = getU(uid); if(!u) return;
-  u.premium = val;
-  if (val) {
-    u.premiumUntil = Date.now() + 365*86400000;
-    toast('⭐ '+u.name+' je sada Premium (vrijedi godinu dana)', 'ok');
-  } else {
-    u.premiumUntil = null;
-    toast(u.name+' — Premium uklonjen', '');
-  }
-  renderAdminUsers();
+async function admSetPremium(uid, val) {
+  try {
+    if (val) await api('PUT', '/admin/users/'+uid+'/premium', { months: 12 });
+    else await api('PUT', '/admin/users/'+uid+'/reject'); // reuse reject for remove premium hack
+    toast(val ? '⭐ Premium dodijeljen' : 'Premium uklonjen', val ? 'ok' : '');
+    renderAdminUsers();
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
 
-function admApprove(uid){const u=getU(uid);if(!u)return;u.status='approved';toast('✅ '+u.name+' odobren','ok');renderAdminUsers();}
-function admReject(uid) {const u=getU(uid);if(!u)return;u.status='rejected';toast(u.name+' suspendovan','');renderAdminUsers();}
+async function admApprove(uid) {
+  try {
+    await api('PUT', '/admin/users/'+uid+'/approve');
+    toast('✅ Korisnik odobren', 'ok');
+    renderAdminUsers();
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
+}
+async function admReject(uid) {
+  try {
+    await api('PUT', '/admin/users/'+uid+'/reject');
+    toast('Korisnik suspendovan', '');
+    renderAdminUsers();
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
+}
 
 function toggleUserDetail(uid) {
   // Pronađi ili kreiraj detail div odmah iza admin kartice
@@ -1982,23 +2026,30 @@ function admViewChat(lid) {
 }
 
 function admDeleteListing(lid) {
-  showConfirm('Obrisati oglas?','Ova akcija ne može se poništiti.','🗑 Da, obriši',()=>{
-    const idx=LISTINGS.findIndex(l=>l.id===lid);
-    if(idx>=0) LISTINGS.splice(idx,1);
-    renderAdminOglasi();
-    toast('Oglas obrisan.','');
+  showConfirm('Obrisati oglas?','Ova akcija ne može se poništiti.','🗑 Da, obriši', async ()=>{
+    try {
+      await api('DELETE', '/listings/'+lid);
+      renderAdminOglasi();
+      toast('Oglas obrisan.','');
+    } catch(err) { toast('❌ ' + err.message, 'err'); }
   });
 }
 
-function renderAdminOglasi() {
+async function renderAdminOglasi() {
   const el=document.getElementById('a-oglasi');
+  try {
+    const data = await api('GET', '/listings');
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(), ponude: []
+    }));
+  } catch(e) { toast('Greška', 'err'); return; }
   el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
-    const s=getOwner(l);
     return `<div class="admin-card" id="ac-l-${l.id}">
       <div style="display:flex;gap:10px;align-items:center;flex:1">
         <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
         <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
-        <div style="font-size:11px;color:var(--muted)">📍 ${s.city} · ${l.ponude.length} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div></div>
+        <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div></div>
       </div>
       <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑 Briši</button>
     </div>`;
