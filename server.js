@@ -1,3 +1,5 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -12,10 +14,21 @@ const PORT = process.env.PORT || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 
 // ─── PostgreSQL ───────────────────────────────────────────
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: false
-});
+// Parsiramo DATABASE_URL ručno da izbjegnemo probleme sa specijalnim znakovima
+function buildPoolConfig() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL nije postavljen u .env');
+  const u = new URL(url);
+  return {
+    host:     u.hostname,
+    port:     parseInt(u.port) || 5432,
+    database: u.pathname.slice(1),
+    user:     u.username,
+    password: decodeURIComponent(u.password),
+    ssl:      false
+  };
+}
+const pool = new Pool(buildPoolConfig());
 
 // ─── Middleware ───────────────────────────────────────────
 app.use(cors({
