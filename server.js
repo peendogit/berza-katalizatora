@@ -577,6 +577,19 @@ app.put('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
   }
 });
 
+// DELETE /api/admin/users/:id/premium  (ukloni premium bez diranja statusa)
+app.delete('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE users SET premium = false, premium_until = NULL WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // DELETE /api/admin/users/:id
 app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   try {
