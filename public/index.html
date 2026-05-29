@@ -598,7 +598,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div style="font-size:11px;color:var(--muted)">Kliknite ili prevucite</div>
       <div class="prev-grid" id="prev-grid" onclick="event.stopPropagation()"></div>
     </div>
-    <button class="btn btn-primary btn-block" onclick="submitListing()">📤 Objavi oglas</button>
+    <button class="btn btn-primary btn-block" id="novi-submit-btn" onclick="submitListing()">📤 Objavi oglas</button>
   </div>
 </div>
 
@@ -1089,9 +1089,9 @@ function rmFile(i) {
 async function submitListing() {
   const marka = document.getElementById('f-marka').value.trim();
   if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+  const btn = document.getElementById('novi-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Objavljujem...'; }
   try {
-    const btn = document.getElementById('novi-submit-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
     let imageUrls = [];
     if (uploads.length > 0) {
       const fd = new FormData();
@@ -1102,16 +1102,17 @@ async function submitListing() {
       if (upData.urls) imageUrls = upData.urls;
     }
     await api('POST', '/listings', {
-      broj:   document.getElementById('f-broj').value.trim(),
+      broj:   document.getElementById('f-broj').value.trim() || '',
       marka,
-      model:  document.getElementById('f-model').value.trim(),
-      god:    document.getElementById('f-god').value.trim(),
-      stanje: document.getElementById('f-stanje').value,
-      nap:    document.getElementById('f-nap').value.trim(),
+      model:  document.getElementById('f-model').value.trim() || '',
+      god:    document.getElementById('f-god').value.trim() || '',
+      stanje: document.getElementById('f-stanje').value || 'Nepoznato',
+      nap:    document.getElementById('f-nap').value.trim() || '',
       images: imageUrls
     });
     uploads = [];
     document.getElementById('prev-grid').innerHTML = '';
+    document.getElementById('file-in').value = '';
     ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
     closeOv('ov-novi');
     toast('✅ Oglas objavljen!', 'ok');
@@ -1119,8 +1120,7 @@ async function submitListing() {
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   } finally {
-    const btn = document.getElementById('novi-submit-btn');
-    if (btn) { btn.disabled = false; btn.textContent = 'Objavi oglas'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; }
   }
 }
 
@@ -1688,11 +1688,16 @@ async function sendChatImg(input) {
   if (!file || !chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
-  const receiver_id = CU.role === 'buyer' ? listing.uid :
-    (listing.ponude && listing.ponude[0] ? listing.ponude[0].buyerId : null);
+  let receiver_id;
+  if (CU.role === 'buyer') {
+    receiver_id = listing.uid || listing.user_id;
+  } else {
+    const msgs = chatHistory[chatLid] || [];
+    const buyerMsg = msgs.find(m => m.senderId !== CU.id);
+    receiver_id = buyerMsg ? buyerMsg.senderId : null;
+  }
   if (!receiver_id) { toast('Nije moguće poslati sliku', 'err'); return; }
   try {
-    // Upload slike
     const fd = new FormData();
     fd.append('images', file);
     const token = localStorage.getItem('token');
@@ -1740,9 +1745,16 @@ async function sendChat() {
   if (!txt||!chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
-  // Odredi receiver_id
-  const receiver_id = CU.role === 'buyer' ? listing.uid : 
-    (listing.ponude && listing.ponude[0] ? listing.ponude[0].buyerId : null);
+  // Buyer šalje prodavaču; seller šalje buyeru kojeg nađemo u chatHistory
+  let receiver_id;
+  if (CU.role === 'buyer') {
+    receiver_id = listing.uid || listing.user_id;
+  } else {
+    // Seller — nađi buyera iz chatHistory
+    const msgs = chatHistory[chatLid] || [];
+    const buyerMsg = msgs.find(m => m.senderId !== CU.id);
+    receiver_id = buyerMsg ? buyerMsg.senderId : null;
+  }
   if (!receiver_id) { toast('Nije moguće poslati poruku', 'err'); return; }
   try {
     await api('POST', '/chat/'+chatLid, { receiver_id, text: txt });
@@ -2063,27 +2075,46 @@ function toggleUserDetail(uid) {
       }
     }, 0);
   }
-  // Konverzacije
-  const userLids = u.role === 'seller'
-    ? LISTINGS.filter(l => l.uid === uid).map(l => l.id)
-    : LISTINGS.filter(l => (chatHistory[l.id]||[]).some(m => m.senderId === uid)).map(l => l.id);
-  const userConvos = userLids.filter(lid => (chatHistory[lid]||[]).length > 0);
-  if (userConvos.length) {
-    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${userConvos.length})</div>`;
-    h += userConvos.map(lid => {
-      const l = LISTINGS.find(x => x.id === lid);
-      if (!l) return '';
-      const msgs = chatHistory[lid] || [];
-      const last = msgs[msgs.length - 1];
-      const preview = last ? (last.msg || '📷 slika').slice(0, 40) : '';
-      return `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="min-width:0;flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
-          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${msgs.length} poruka · "${preview}"</div>
-        </div>
-        <button class="btn btn-ghost btn-xs" onclick="admViewChat(${lid})">👁 Čitaj</button>
-      </div>`;
-    }).join('');
+  // Konverzacije — fetchuj async iz API-ja
+  const myListingIds = u.role === 'seller'
+    ? LISTINGS.filter(l => String(l.uid||l.user_id) === String(uid)).map(l => l.id)
+    : [];
+  if (myListingIds.length || u.role === 'buyer') {
+    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije</div>`;
+    h += `<div id="adc-${uid}" style="font-size:12px;color:var(--muted)">Učitavam...</div>`;
+    setTimeout(async () => {
+      try {
+        const lidsToCheck = u.role === 'seller' ? myListingIds : LISTINGS.map(l => l.id);
+        const convos = [];
+        await Promise.all(lidsToCheck.map(async lid => {
+          try {
+            const msgs = await api('GET', '/chat/'+lid);
+            if (!msgs.length) return;
+            const relevant = u.role === 'seller'
+              ? msgs
+              : msgs.filter(m => String(m.sender_id) === String(uid));
+            if (!relevant.length) return;
+            const l = LISTINGS.find(x => x.id === lid);
+            const last = msgs[msgs.length-1];
+            convos.push({ lid, listing: l, count: msgs.length, last });
+          } catch(e) {}
+        }));
+        const dcEl = document.getElementById('adc-'+uid);
+        if (!dcEl) return;
+        dcEl.innerHTML = convos.length ? convos.map(c =>
+          `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div style="min-width:0;flex:1">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
+              <div style="font-size:11px;color:var(--muted)">${c.count} poruka · "${(c.last.text||'📷').slice(0,30)}"</div>
+            </div>
+            <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
+          </div>`).join('')
+          : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>';
+      } catch(e) {
+        const dcEl = document.getElementById('adc-'+uid);
+        if (dcEl) dcEl.innerHTML = '<div style="font-size:12px;color:var(--red)">Greška</div>';
+      }
+    }, 0);
   }
   h+='<div class="divider"></div><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'ad-'+uid+'\').style.display=\'none\'">← Zatvori</button></div>';
   el.style.background='var(--dark)';
@@ -2260,30 +2291,25 @@ function renderPoruke() {
   });
 }
 
-function openSellerChat(lid) {
-  // Otvori chat kao seller (suprotna strana)
+async function openSellerChat(lid) {
   chatLid = lid;
   const l = LISTINGS.find(x => x.id === lid);
-  // Pronađi ko je pisao (buyer)
+  document.getElementById('ov-chat').classList.add('on');
+  // Učitaj poruke iz API-ja da dobijemo buyerov senderId
+  await loadChatMsgs(lid);
   const msgs = chatHistory[lid] || [];
-  const buyerMsg = msgs.find(m => m.from === 'buyer');
-  const buyerName = buyerMsg ? (buyerMsg.buyerName || 'Otkupljivač') : 'Otkupljivač';
-  const buyerId   = buyerMsg ? (buyerMsg.buyerId || 'x') : 'x';
+  const buyerMsg = msgs.find(m => m.senderId !== CU.id);
+  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
+  const buyerId   = buyerMsg ? buyerMsg.senderId : 'x';
   document.getElementById('ch-av').textContent = initials(buyerName);
-  document.getElementById('ch-av').style.background = avCol(buyerId);
-  document.getElementById('ch-name').textContent = buyerName + ' · ' + l.marka + ' ' + l.model;
+  document.getElementById('ch-av').style.background = avCol(String(buyerId));
+  document.getElementById('ch-name').textContent = buyerName + ' · ' + (l ? l.marka + ' ' + l.model : '');
   const ta = document.getElementById('chat-ta');
   ta.value = ''; ta.style.height = 'auto';
   updateSendBtn();
-  // Render poruka iz seller perspektive
-  renderSellerChatMsgs(lid, buyerName, buyerId);
-  document.getElementById('ov-chat').classList.add('on');
+  markRead(lid);
+  updatePorukeBadges();
   setTimeout(() => ta.focus(), 150);
-}
-
-function renderSellerChatMsgs(lid, buyerName, buyerId) {
-  // Koristimo isti renderChatMsgs koji je svjestan CU.id
-  renderChatMsgs();
 }
 
 
