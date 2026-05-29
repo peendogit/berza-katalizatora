@@ -113,7 +113,6 @@ app.post('/api/auth/register', async (req, res) => {
 
     const user = result.rows[0];
     const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country }, JWT_SECRET, { expiresIn: '30d' });
-
     res.status(201).json({ user, token });
   } catch (err) {
     console.error('Register error:', err);
@@ -153,7 +152,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, country
+      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, default_dana, country
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -200,19 +199,29 @@ app.get('/api/listings', auth, async (req, res) => {
         GROUP BY l.id, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [req.user.id];
-    } else {
-      // buyer i admin vide sve aktivne — filtrirani po zemlji
-      const countryFilter = req.user.role === 'admin' ? '' : `AND l.country = $1`;
+    } else if (req.user.role === 'admin') {
+      // Admin vidi SVE oglase bez filtera
       query = `
         SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
-        WHERE l.status = 'active' ${countryFilter}
         GROUP BY l.id, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
-      params = req.user.role === 'admin' ? [] : [req.user.country || 'BA'];
+      params = [];
+    } else {
+      // Buyer vidi samo aktivne iz svoje zemlje
+      query = `
+        SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
+               COUNT(p.id) as ponuda_count
+        FROM listings l
+        JOIN users u ON u.id = l.user_id
+        LEFT JOIN ponude p ON p.listing_id = l.id
+        WHERE l.status = 'active' AND l.country = $1
+        GROUP BY l.id, u.name, u.city, u.tel
+        ORDER BY l.created_at DESC`;
+      params = [req.user.country || 'BA'];
     }
 
     const result = await pool.query(query, params);
@@ -405,7 +414,7 @@ app.post('/api/ponude', auth, async (req, res) => {
 app.get('/api/ponude/my', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, 
+      `SELECT p.*,
               l.marka, l.model, l.god, l.broj, l.stanje, l.status as listing_status,
               l.images as listing_images,
               u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
@@ -543,16 +552,6 @@ app.post('/api/chat/:listing_id', auth, async (req, res) => {
 // ADMIN ROUTES
 // ═══════════════════════════════════════════════════════════
 
-// DELETE /api/admin/users/:id/premium
-app.delete('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
-  try {
-    await pool.query(`UPDATE users SET premium = false, premium_until = NULL WHERE id = $1`, [req.params.id]);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Greška' });
-  }
-});
-
 // GET /api/admin/users
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
@@ -591,10 +590,17 @@ app.put('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
   try {
     const { months } = req.body;
     const until = new Date(Date.now() + (months || 1) * 30 * 86400000);
-    await pool.query(
-      `UPDATE users SET premium = true, premium_until = $1 WHERE id = $2`,
-      [until, req.params.id]
-    );
+    await pool.query(`UPDATE users SET premium = true, premium_until = $1 WHERE id = $2`, [until, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// DELETE /api/admin/users/:id/premium
+app.delete('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query(`UPDATE users SET premium = false, premium_until = NULL WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
