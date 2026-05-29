@@ -189,16 +189,17 @@ app.get('/api/listings', auth, async (req, res) => {
     let query, params;
 
     if (req.user.role === 'seller') {
+      console.log('SELLER listings request, user.id:', req.user.id, typeof req.user.id);
       query = `
         SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
-        WHERE l.user_id = $1
+        WHERE l.user_id = $1::integer
         GROUP BY l.id, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
-      params = [req.user.id];
+      params = [parseInt(req.user.id)];
     } else if (req.user.role === 'admin') {
       // Admin vidi SVE oglase bez filtera
       query = `
