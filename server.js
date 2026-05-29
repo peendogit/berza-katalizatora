@@ -87,13 +87,14 @@ function adminOnly(req, res, next) {
 // POST /api/auth/register
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, role, city, addr, tel } = req.body;
+    const { email, password, name, role, city, addr, tel, country } = req.body;
     if (!email || !password || !name || !role) {
       return res.status(400).json({ error: 'Popunite sva obavezna polja' });
     }
     if (!['seller', 'buyer'].includes(role)) {
       return res.status(400).json({ error: 'Nevažeća uloga' });
     }
+    const userCountry = ['BA','RS'].includes(country) ? country : 'BA';
 
     const exists = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
     if (exists.rows.length > 0) {
@@ -101,17 +102,17 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const status = role === 'buyer' ? 'pending' : 'approved'; // buyeri čekaju odobrenje
+    const status = role === 'buyer' ? 'pending' : 'approved';
 
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, name, role, status, city, addr, tel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, email, name, role, status, city, addr, tel, premium, created_at`,
-      [email.toLowerCase(), hash, name, role, status, city || '', addr || '', tel || '']
+      `INSERT INTO users (email, password_hash, name, role, status, city, addr, tel, country)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, email, name, role, status, city, addr, tel, premium, country, created_at`,
+      [email.toLowerCase(), hash, name, role, status, city || '', addr || '', tel || '', userCountry]
     );
 
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country }, JWT_SECRET, { expiresIn: '30d' });
 
     res.status(201).json({ user, token });
   } catch (err) {
@@ -125,7 +126,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const result = await pool.query(
-      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, password_hash
+      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, country, password_hash
        FROM users WHERE email = $1`,
       [email.toLowerCase()]
     );
@@ -139,7 +140,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Pogrešan email ili lozinka' });
 
     delete user.password_hash;
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country }, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({ user, token });
   } catch (err) {
@@ -152,7 +153,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until
+      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, country
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -200,17 +201,18 @@ app.get('/api/listings', auth, async (req, res) => {
         ORDER BY l.created_at DESC`;
       params = [req.user.id];
     } else {
-      // buyer i admin vide sve aktivne
+      // buyer i admin vide sve aktivne — filtrirani po zemlji
+      const countryFilter = req.user.role === 'admin' ? '' : `AND l.country = $1`;
       query = `
         SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
-        WHERE l.status = 'active'
+        WHERE l.status = 'active' ${countryFilter}
         GROUP BY l.id, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
-      params = [];
+      params = req.user.role === 'admin' ? [] : [req.user.country || 'BA'];
     }
 
     const result = await pool.query(query, params);
@@ -286,15 +288,16 @@ app.post('/api/listings', auth, async (req, res) => {
     if (req.user.role !== 'seller') return res.status(403).json({ error: 'Samo prodavci mogu objavljivati' });
 
     const { broj, marka, model, god, stanje, nap, images } = req.body;
-    if (!broj || !marka || !model || !god || !stanje) {
-      return res.status(400).json({ error: 'Popunite obavezna polja' });
+    if (!marka) {
+      return res.status(400).json({ error: 'Marka vozila je obavezna' });
     }
 
     const result = await pool.query(
-      `INSERT INTO listings (user_id, broj, marka, model, god, stanje, nap, images, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+      `INSERT INTO listings (user_id, broj, marka, model, god, stanje, nap, images, status, country)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)
        RETURNING *`,
-      [req.user.id, broj, marka, model, god, stanje, nap || '', JSON.stringify(images || [])]
+      [req.user.id, broj||'', marka, model||'', god||'', stanje||'Nepoznato', nap||'',
+       JSON.stringify(images||[]), req.user.country || 'BA']
     );
 
     res.status(201).json(result.rows[0]);
@@ -529,11 +532,21 @@ app.post('/api/chat/:listing_id', auth, async (req, res) => {
 // ADMIN ROUTES
 // ═══════════════════════════════════════════════════════════
 
+// DELETE /api/admin/users/:id/premium
+app.delete('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
+  try {
+    await pool.query(`UPDATE users SET premium = false, premium_until = NULL WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // GET /api/admin/users
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, role, status, city, tel, premium, premium_until, created_at
+      `SELECT id, email, name, role, status, city, tel, premium, premium_until, country, created_at
        FROM users ORDER BY created_at DESC`
     );
     res.json(result.rows);
@@ -570,19 +583,6 @@ app.put('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
     await pool.query(
       `UPDATE users SET premium = true, premium_until = $1 WHERE id = $2`,
       [until, req.params.id]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Greška' });
-  }
-});
-
-// DELETE /api/admin/users/:id/premium  (ukloni premium bez diranja statusa)
-app.delete('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
-  try {
-    await pool.query(
-      `UPDATE users SET premium = false, premium_until = NULL WHERE id = $1`,
-      [req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
