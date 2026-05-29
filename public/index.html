@@ -1206,7 +1206,7 @@ async function renderMyListings() {
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
-  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
+  const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id) && l.status==='active');
   const el = document.getElementById('s-oglasi');
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
@@ -1399,7 +1399,7 @@ async function renderZavrseni() {
     }));
   } catch(e) { el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><h3>Greška</h3></div>'; return; }
 
-  const mine = LISTINGS.filter(l => l.uid === CU.id && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
+  const mine = LISTINGS.filter(l => String(l.uid) === String(CU.id) && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Nema završenih oglasa</h3><p>Ovdje će biti oglasi koje ste prodali.</p></div>`;
     return;
@@ -1749,7 +1749,7 @@ function markAllPorukeRead(role) {
   if (!CU) return;
   if (role === 'seller') {
     // Označi sve poruke na seller-ovim oglasima kao pročitane
-    LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
+    LISTINGS.filter(l => String(l.uid)===String(CU.id)).forEach(l => {
       if ((chatHistory[l.id]||[]).length) markRead(l.id);
     });
   } else {
@@ -1773,7 +1773,7 @@ function hasUnread(lid) {
 function updatePorukeBadges() {
   if (!CU) return;
   if (CU.role === 'seller') {
-    const myIds = LISTINGS.filter(l => l.uid === CU.id).map(l => l.id);
+    const myIds = LISTINGS.filter(l => String(l.uid)===String(CU.id)).map(l => l.id);
     const cnt = myIds.filter(lid => hasUnread(lid)).length;
     const b = document.getElementById('poruke-badge');
     if (b) { b.style.display = cnt ? 'inline' : 'none'; b.textContent = cnt; }
@@ -2428,7 +2428,7 @@ function openNoviOglas() {
 function renderPoruke() {
   const el = document.getElementById('s-poruke');
   // Skupi sve konverzacije gdje ima poruka za prodavačeve oglase
-  const myListingIds = LISTINGS.filter(l => l.uid === CU.id).map(l => l.id);
+  const myListingIds = LISTINGS.filter(l => String(l.uid)===String(CU.id)).map(l => l.id);
   const convos = [];
   myListingIds.forEach(lid => {
     const msgs = chatHistory[lid] || [];
@@ -2840,7 +2840,7 @@ let lastSeenPonude = {}; // lid -> broj ponuda kad je zadnji put gledao
 
 function updateOglasiBadge() {
   if (!CU || CU.role !== 'seller') return;
-  const mine = LISTINGS.filter(l => l.uid === CU.id);
+  const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id));
   let newCount = 0;
   mine.forEach(l => {
     const seen = lastSeenPonude[l.id] || 0;
@@ -2853,7 +2853,7 @@ function updateOglasiBadge() {
 
 function markOglasiSeen() {
   if (!CU) return;
-  LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
+  LISTINGS.filter(l => String(l.uid)===String(CU.id)).forEach(l => {
     lastSeenPonude[l.id] = l.ponude.filter(p => p.status === 'pending').length;
   });
   const b = document.getElementById('oglasi-badge');
