@@ -592,7 +592,6 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
     <div class="fg"><label>Napomena <span style="color:var(--muted);font-weight:400;font-size:11px">— opcija</span></label><textarea id="f-nap" rows="2" placeholder="Dodatne info za otkupljivače..."></textarea></div>
     <div class="upload-zone" id="uz" onclick="document.getElementById('file-in').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)" style="padding:18px;margin-bottom:12px">
       <input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
-      <input type="file" id="chat-img-in" accept="image/*" style="display:none" onchange="sendChatImg(this)">
       <div style="font-size:28px;margin-bottom:4px">📷</div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;margin-bottom:2px">Dodajte slike (opcija)</div>
       <div style="font-size:11px;color:var(--muted)">Kliknite ili prevucite</div>
@@ -752,6 +751,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
   <button onclick="closeLightbox()" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:2">✕</button>
 </div>
 <div class="toast" id="toast"></div>
+<input type="file" id="chat-img-in" accept="image/*" style="display:none" onchange="sendChatImg(this)">
 <button class="fab" id="fab" onclick="openNoviOglas()" title="Novi oglas">+</button>
 
 <script>
@@ -868,8 +868,8 @@ function showRegisterPage() { showPage('page-register'); setTimeout(() => initAC
 function goHome() {
   if (!CU) { showPage('page-hero'); return; }
   if (CU.role === 'admin')        { showPage('page-admin');  aTab('users'); }
-  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('novi'); }
-  else                            { showPage('page-buyer'); }
+  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('oglasi'); }
+  else                            { showPage('page-buyer');  bTab('oglasi'); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1070,17 +1070,43 @@ function aTab(n) {
 // UPLOAD
 // ═══════════════════════════════════════════════════════
 function handleDrop(e) { e.preventDefault(); document.getElementById('uz').classList.remove('drag'); handleFiles(e.dataTransfer.files); }
+// Kompresija slike na max 1200px, JPEG quality 0.82
+function compressImage(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => resolve(file); // fallback bez kompresije
+    img.src = url;
+  });
+}
+
 function handleFiles(files) {
   for (const f of files) if (f.type.startsWith('image/')) uploads.push(f);
+  renderPreviews();
+}
+
+function renderPreviews() {
   document.getElementById('prev-grid').innerHTML = uploads.map((f,i)=>
     `<div class="prev-item"><img src="${URL.createObjectURL(f)}"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${i})">✕</button></div>`
   ).join('');
 }
+
 function rmFile(i) {
   uploads.splice(i,1);
-  document.getElementById('prev-grid').innerHTML = uploads.map((f,j)=>
-    `<div class="prev-item"><img src="${URL.createObjectURL(f)}"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${j})">✕</button></div>`
-  ).join('');
+  renderPreviews();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1094,8 +1120,9 @@ async function submitListing() {
   try {
     let imageUrls = [];
     if (uploads.length > 0) {
+      const compressed = await Promise.all(uploads.map(f => compressImage(f)));
       const fd = new FormData();
-      uploads.forEach(f => fd.append('images', f));
+      compressed.forEach(f => fd.append('images', f));
       const token = localStorage.getItem('token');
       const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
       const upData = await upRes.json();
@@ -2019,7 +2046,6 @@ async function admReject(uid) {
 }
 
 function toggleUserDetail(uid) {
-  // Pronađi ili kreiraj detail div odmah iza admin kartice
   let el = document.getElementById('ad-'+uid);
   if (!el) {
     const card = document.getElementById('ac-'+uid);
@@ -2032,100 +2058,118 @@ function toggleUserDetail(uid) {
   if (el.style.display !== 'none') { el.style.display='none'; return; }
   const u = USERS.find(x => String(x.id)===String(uid));
   if (!u) { toast('Osvježi stranicu pa pokušaj ponovo', 'err'); return; }
-  const col=u.role==='buyer'?'#c0392b':'#e67e22';
-  let h=`<div class="card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-    <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
-    <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
-    <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div></div>
-  </div><div class="divider">`;
-  if(u.role==='seller'){
-    const myL=LISTINGS.filter(l=>l.uid===uid);
-    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📋 Oglasi (${myL.length})</div>`;
-    h+=myL.length?myL.map(l=>`<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div><div style="font-size:11px;color:var(--muted)">${l.ponude.length} ponuda · ${l.status}</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--orange2)">${l.status==='sold'?(l.ponude.find(p=>p.status==='accepted')||{cijena:0}).cijena:0} KM</span><button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑</button></div></div>`).join(''):
-    '<div style="font-size:12px;color:var(--muted)">Nema oglasa</div>';
-  } else {
-    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📨 Ponude</div>`;
-    h+=`<div id="adp-${uid}" style="font-size:12px;color:var(--muted)">Učitavam...</div>`;
-    // Async fetch ponude za ovog buyera
-    setTimeout(async () => {
-      try {
-        const allL = await api('GET', '/listings');
+  const col = u.role==='buyer' ? '#c0392b' : '#e67e22';
+
+  // Odmah prikaži skeleton
+  el.style.cssText = 'background:var(--dark);border-radius:0 0 8px 8px;margin-top:-8px;border:1px solid var(--border);border-top:none;padding:14px 16px';
+  el.innerHTML = `<div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
+        <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div>
+        ${u.addr?`<div style="font-size:12px;color:var(--muted2)">📌 ${u.addr}</div>`:''}
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div id="adp-${uid}"><div style="font-size:12px;color:var(--muted)">Učitavam...</div></div>
+    <div class="divider"></div>
+    <div id="adc-${uid}"><div style="font-size:12px;color:var(--muted)">Učitavam konverzacije...</div></div>
+    <div class="divider"></div>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ad-${uid}').style.display='none'">← Zatvori</button>
+  </div>`;
+  el.style.display = '';
+  el.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  // Async load svega
+  setTimeout(async () => {
+    try {
+      const allListings = await api('GET', '/listings');
+      const pdEl = document.getElementById('adp-'+uid);
+      const dcEl = document.getElementById('adc-'+uid);
+
+      if (u.role === 'seller') {
+        // Oglasi prodavača
+        const myL = allListings.filter(l => String(l.user_id||l.uid) === String(uid));
+        if (pdEl) pdEl.innerHTML = `
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📋 Oglasi (${myL.length})</div>
+          ${myL.length ? myL.map(l => `
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
+                <div style="font-size:11px;color:var(--muted)">${l.ponuda_count||0} ponuda · ${l.status}</div>
+              </div>
+              <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑</button>
+            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema oglasa</div>'}`;
+
+        // Konverzacije sellera
+        const sellerLids = myL.map(l => l.id);
+        const convos = [];
+        await Promise.all(sellerLids.map(async lid => {
+          try {
+            const msgs = await api('GET', '/chat/'+lid);
+            if (!msgs.length) return;
+            const listing = allListings.find(x => x.id === lid);
+            convos.push({ lid, listing, count: msgs.length, last: msgs[msgs.length-1] });
+          } catch(e) {}
+        }));
+        if (dcEl) dcEl.innerHTML = `
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${convos.length})</div>
+          ${convos.length ? convos.map(c => `
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="min-width:0;flex:1">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
+                <div style="font-size:11px;color:var(--muted)">${c.count} poruka · "${(c.last.text||'📷').slice(0,30)}"</div>
+              </div>
+              <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
+            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>'}`;
+
+      } else {
+        // Buyer — ponude i konverzacije
         const buyerPonude = [];
-        await Promise.all(allL.map(async l => {
+        const buyerConvos = [];
+        await Promise.all(allListings.map(async l => {
           try {
             const detail = await api('GET', '/listings/'+l.id);
             (detail.ponude||[]).filter(p => String(p.buyer_id)===String(uid)).forEach(p => {
               buyerPonude.push({ listing: l, p });
             });
           } catch(e) {}
-        }));
-        const pdEl = document.getElementById('adp-'+uid);
-        if (!pdEl) return;
-        pdEl.innerHTML = buyerPonude.length ? buyerPonude.map(({listing, p}) =>
-          `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${listing.marka} ${listing.model}</div>
-              <div style="font-size:11px;color:var(--muted)">${p.status}</div>
-            </div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${parseFloat(p.cijena)} KM</div>
-          </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
-      } catch(e) {
-        const pdEl = document.getElementById('adp-'+uid);
-        if (pdEl) pdEl.innerHTML = '<div style="font-size:12px;color:var(--red)">Greška</div>';
-      }
-    }, 0);
-  }
-  // Konverzacije — fetchuj async iz API-ja
-  const myListingIds = u.role === 'seller'
-    ? LISTINGS.filter(l => String(l.uid||l.user_id) === String(uid)).map(l => l.id)
-    : [];
-  if (myListingIds.length || u.role === 'buyer') {
-    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije</div>`;
-    h += `<div id="adc-${uid}" style="font-size:12px;color:var(--muted)">Učitavam...</div>`;
-    setTimeout(async () => {
-      try {
-        const lidsToCheck = u.role === 'seller' ? myListingIds : LISTINGS.map(l => l.id);
-        const convos = [];
-        await Promise.all(lidsToCheck.map(async lid => {
           try {
-            const msgs = await api('GET', '/chat/'+lid);
-            if (!msgs.length) return;
-            const relevant = u.role === 'seller'
-              ? msgs
-              : msgs.filter(m => String(m.sender_id) === String(uid));
-            if (!relevant.length) return;
-            const l = LISTINGS.find(x => x.id === lid);
-            const last = msgs[msgs.length-1];
-            convos.push({ lid, listing: l, count: msgs.length, last });
+            const msgs = await api('GET', '/chat/'+l.id);
+            if (msgs.some(m => String(m.sender_id)===String(uid))) {
+              buyerConvos.push({ lid: l.id, listing: l, count: msgs.length, last: msgs[msgs.length-1] });
+            }
           } catch(e) {}
         }));
-        const dcEl = document.getElementById('adc-'+uid);
-        if (!dcEl) return;
-        dcEl.innerHTML = convos.length ? convos.map(c =>
-          `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-            <div style="min-width:0;flex:1">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
-              <div style="font-size:11px;color:var(--muted)">${c.count} poruka · "${(c.last.text||'📷').slice(0,30)}"</div>
-            </div>
-            <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
-          </div>`).join('')
-          : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>';
-      } catch(e) {
-        const dcEl = document.getElementById('adc-'+uid);
-        if (dcEl) dcEl.innerHTML = '<div style="font-size:12px;color:var(--red)">Greška</div>';
+
+        if (pdEl) pdEl.innerHTML = `
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📨 Ponude (${buyerPonude.length})</div>
+          ${buyerPonude.length ? buyerPonude.map(({listing, p}) => `
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${listing.marka} ${listing.model}</div>
+                <div style="font-size:11px;color:var(--muted)">${p.status}</div>
+              </div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${parseFloat(p.cijena)} KM</div>
+            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>'}`;
+
+        if (dcEl) dcEl.innerHTML = `
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${buyerConvos.length})</div>
+          ${buyerConvos.length ? buyerConvos.map(c => `
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="min-width:0;flex:1">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
+                <div style="font-size:11px;color:var(--muted)">${c.count} poruka</div>
+              </div>
+              <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
+            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>'}`;
       }
-    }, 0);
-  }
-  h+='<div class="divider"></div><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'ad-'+uid+'\').style.display=\'none\'">← Zatvori</button></div>';
-  el.style.background='var(--dark)';
-  el.style.borderRadius='0 0 8px 8px';
-  el.style.marginTop='-8px';
-  el.style.border='1px solid var(--border)';
-  el.style.borderTop='none';
-  el.style.padding='14px 16px';
-  el.innerHTML=h;
-  el.style.display='';
-  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+    } catch(e) {
+      const pdEl = document.getElementById('adp-'+uid);
+      if (pdEl) pdEl.innerHTML = '<div style="font-size:12px;color:var(--red)">Greška pri učitavanju</div>';
+    }
+  }, 0);
 }
 
 
