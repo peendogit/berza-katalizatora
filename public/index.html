@@ -1199,15 +1199,19 @@ function expireOld() {
 // ═══════════════════════════════════════════════════════
 async function renderMyListings() {
   updateOglasiBadge();
+  const el = document.getElementById('s-oglasi');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
       ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
-  } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><h3>Greška: ${e.message}</h3></div>`;
+    return;
+  }
   const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id) && l.status==='active');
-  const el = document.getElementById('s-oglasi');
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
