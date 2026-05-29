@@ -475,8 +475,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div class="row2">
         <div class="fg"><label>Država *</label>
           <select id="reg-country" onchange="onCountryChange('reg-country','reg-city')">
-            <option value="ba">Bosna i Hercegovina</option>
-            <option value="rs">Srbija</option>
+            <option value="BA">🇧🇦 Bosna i Hercegovina</option>
+            <option value="RS">🇷🇸 Srbija</option>
           </select>
         </div>
         <div class="fg"><label>Grad *</label>
@@ -562,6 +562,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
         <button class="btn btn-primary btn-xs" id="af-all"    onclick="setAdminFilter('all')">Svi</button>
         <button class="btn btn-ghost btn-xs"   id="af-seller" onclick="setAdminFilter('seller')">Prodavači</button>
         <button class="btn btn-ghost btn-xs"   id="af-buyer"  onclick="setAdminFilter('buyer')">Otkupljivači</button>
+        <button class="btn btn-ghost btn-xs"   id="af-BA"     onclick="setAdminFilter('BA')">🇧🇦 BiH</button>
+        <button class="btn btn-ghost btn-xs"   id="af-RS"     onclick="setAdminFilter('RS')">🇷🇸 Srbija</button>
       </div>
       <div class="fg" style="margin-bottom:12px"><input id="admin-search" placeholder="🔍 Pretraži (ime, email, grad)..." oninput="renderAdminUsers()"></div>
       <div id="a-users"></div>
@@ -946,7 +948,8 @@ async function doRegister() {
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
+    const country = document.getElementById('reg-country').value || 'BA';
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole, country });
     localStorage.setItem('token', token);
     loginUser(user);
     if (user.status === 'pending') toast('✅ Registracija uspješna! Čekate odobrenje admina.', 'ok');
@@ -1925,7 +1928,7 @@ function showConfirm(title,msg,okLabel,cb) {
 // ═══════════════════════════════════════════════════════
 function setAdminFilter(f) {
   adminFilter=f;
-  ['all','seller','buyer'].forEach(x=>{
+  ['all','seller','buyer','BA','RS'].forEach(x=>{
     const b=document.getElementById('af-'+x);
     if(b){ b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost'); }
   });
@@ -1938,7 +1941,9 @@ async function renderAdminUsers() {
     const data = await api('GET', '/admin/users');
     USERS = data;
   } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
-  let list=USERS.filter(u=>u.role!=='admin'&&(adminFilter==='all'||u.role===adminFilter));
+  let list=USERS.filter(u=>u.role!=='admin');
+  if(adminFilter==='seller'||adminFilter==='buyer') list=list.filter(u=>u.role===adminFilter);
+  if(adminFilter==='BA'||adminFilter==='RS') list=list.filter(u=>(u.country||'BA')===adminFilter);
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
   const pend=list.filter(u=>u.status==='pending');
   const rest=list.filter(u=>u.status!=='pending');
@@ -1966,6 +1971,7 @@ function adminCard(u) {
   const premUntil = u.premium_until ? new Date(u.premium_until).getTime() : (u.premiumUntil || null);
   const premStr = premUntil ? ' do '+fmtDate(premUntil) : '';
   const premB = u.premium ? `<span class="badge b-orange" style="font-size:10px">⭐ Premium${premStr}</span>` : '';
+  const flag = (u.country||'BA') === 'RS' ? '🇷🇸' : '🇧🇦';
   // Sve akcije u jedan dropdown
   const ddItems = [];
   if (u.status==='pending') {
@@ -1989,7 +1995,7 @@ function adminCard(u) {
     <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
       <div class="admin-av" style="background:${col}">${initials(u.name)}</div>
       <div style="min-width:0">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${premB}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${flag} ${u.name} ${rB} ${sB} ${premB}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
       </div>
     </div>
