@@ -1206,8 +1206,10 @@ async function renderMyListings() {
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
-    const thumb = l.thumb ? `<img src="${l.thumb}">` : '🔧';
-    const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
+    const images = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumb = images.length
+      ? `<img src="${images[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(images)},0)">`
+      : '🔧';
     const expW = pend===0 && rem<=3 && rem>0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
@@ -1330,14 +1332,22 @@ async function renderBuyerZavrseni() {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await api('GET', '/ponude/my');
-    const accepted = data.filter(p => p.status === 'accepted');
+    // Samo ponude koje je OVAJ buyer dobio (status accepted)
+    // i oglas je zaista završen (listing_status = finished/sent/sold)
+    const accepted = data.filter(p =>
+      p.status === 'accepted' &&
+      (p.listing_status === 'finished' || p.listing_status === 'sent' || p.listing_status === 'sold')
+    );
     if (!accepted.length) {
       el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Nema završenih kupovina</h3><p>Ovdje će se prikazati oglasi čiju ste ponudu prihvaćenu.</p></div>`;
       return;
     }
     el.innerHTML = accepted.map(p => {
       const isPoslato = p.listing_status === 'sent';
-      const thumb = p.listing_image ? `<img src="${p.listing_image}">` : '🔧';
+      const _imgs = p.listing_image ? [p.listing_image] : [];
+      const thumb = _imgs.length
+        ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="openGallery(${JSON.stringify(_imgs)},0)">`
+        : '🔧';
       return `<div class="card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px">${thumb}</div>
@@ -1398,7 +1408,10 @@ async function renderZavrseni() {
 
   el.innerHTML = sorted.map(l => {
     const acc = l.ponude.find(p => p.status === 'accepted');
-    const thumb = l.thumb ? `<img src="${l.thumb}">` : '🔧';
+    const _imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumb = _imgs.length
+      ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(_imgs)},0)">`
+      : '🔧';
     const isPoslato = poslatoSet.has(l.id);
 
     const addrBlock = acc ? `
@@ -2341,6 +2354,7 @@ function admDeleteListing(lid) {
 
 async function renderAdminOglasi() {
   const el=document.getElementById('a-oglasi');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
@@ -2348,16 +2362,34 @@ async function renderAdminOglasi() {
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { toast('Greška', 'err'); return; }
-  el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
-    return `<div class="admin-card" id="ac-l-${l.id}">
-      <div style="display:flex;gap:10px;align-items:center;flex:1">
-        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
-        <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
-        <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div></div>
+  el.innerHTML = LISTINGS.length ? LISTINGS.map(l => {
+    const imgs = (l.images && l.images.length) ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbHtml = imgs.length
+      ? `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0;cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(imgs)},0)"><img src="${imgs[0]}"></div>`
+      : `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">🔧</div>`;
+    return `<div class="admin-card" id="ac-l-${l.id}" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;gap:10px;align-items:center;width:100%" onclick="toggleAdminListing(${l.id})">
+        ${thumbHtml}
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · 👤 ${l.owner_name||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div>
+        </div>
+        <button class="btn btn-or btn-xs" onclick="event.stopPropagation();admDeleteListing(${l.id})">🗑</button>
       </div>
-      <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑 Briši</button>
+      <div id="al-${l.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${l.broj?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">OEM: <b style="color:var(--text)">${l.broj}</b></div>`:''}
+        ${l.stanje?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Stanje: <b style="color:var(--text)">${l.stanje}</b></div>`:''}
+        ${l.nap?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Napomena: ${l.nap}</div>`:''}
+        <div style="font-size:12px;color:var(--muted2)">Objavljeno: ${fmtDate(l.createdAt)}</div>
+        ${imgs.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${imgs.map((img,i)=>`<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:5px;cursor:zoom-in" onclick="openGallery(${JSON.stringify(imgs)},${i})">`).join('')}</div>` : ''}
+      </div>
     </div>`;
-  }).join(''):`<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
+  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
+}
+
+function toggleAdminListing(lid) {
+  const d = document.getElementById('al-'+lid);
+  if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
 }
 
 
