@@ -405,14 +405,25 @@ app.post('/api/ponude', auth, async (req, res) => {
 app.get('/api/ponude/my', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, l.marka, l.model, l.god, l.broj, l.stanje
+      `SELECT p.*, 
+              l.marka, l.model, l.god, l.broj, l.stanje, l.status as listing_status,
+              l.images as listing_images,
+              u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
+              buyer.name as buyer_name, buyer.city as buyer_city,
+              buyer.tel as buyer_tel, buyer.addr as buyer_addr
        FROM ponude p
        JOIN listings l ON l.id = p.listing_id
+       JOIN users u ON u.id = l.user_id
+       JOIN users buyer ON buyer.id = p.buyer_id
        WHERE p.buyer_id = $1
        ORDER BY p.created_at DESC`,
       [req.user.id]
     );
-    res.json(result.rows);
+    const rows = result.rows.map(r => ({
+      ...r,
+      listing_image: (() => { try { const imgs = JSON.parse(r.listing_images||'[]'); return imgs[0]||null; } catch(e){ return null; } })()
+    }));
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
   }
