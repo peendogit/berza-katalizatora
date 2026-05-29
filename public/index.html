@@ -2556,7 +2556,7 @@ function showAC(inputId, countrySelectId) {
 
   // Odredi koja država je odabrana
   const cEl = document.getElementById(countrySelectId);
-  const country = cEl ? cEl.value : 'ba';
+  const country = (cEl ? cEl.value : 'BA').toLowerCase();
   const cities = CITIES[country] || CITIES.ba;
 
   const matches = cities.filter(c => c.toLowerCase().includes(val)).slice(0, 8);
