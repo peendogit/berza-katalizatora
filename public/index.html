@@ -1086,6 +1086,11 @@ function parseImgs(raw) {
   try { return JSON.parse(raw) || []; } catch(e) { return []; }
 }
 
+// Globalna mapa slika za lightbox (izbjegava JSON.stringify u onclick)
+const _imgStore = {};
+function storeImgs(lid, imgs) { _imgStore[lid] = imgs; return imgs; }
+function galleryById(lid, idx) { openGallery(_imgStore[lid] || [], idx); }
+
 // Kompresija slike na max 1200px, JPEG quality 0.82
 function compressImage(file) {
   return new Promise(resolve => {
@@ -1212,9 +1217,9 @@ async function renderMyListings() {
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
-    const images = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
+    const images = storeImgs('s'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
     const thumb = images.length
-      ? `<img src="${images[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(images)},0)">`
+      ? `<img src="${images[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();galleryById('s${l.id}',0)">`
       : '🔧';
     const expW = pend===0 && rem<=3 && rem>0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
@@ -1351,8 +1356,10 @@ async function renderBuyerZavrseni() {
     el.innerHTML = accepted.map(p => {
       const isPoslato = p.listing_status === 'sent';
       const _imgs = p.listing_image ? [p.listing_image] : [];
+      const _key = 'bz'+p.id;
+      storeImgs(_key, _imgs);
       const thumb = _imgs.length
-        ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="openGallery(${JSON.stringify(_imgs)},0)">`
+        ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="galleryById('${_key}',0)">`
         : '🔧';
       return `<div class="card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -1414,9 +1421,9 @@ async function renderZavrseni() {
 
   el.innerHTML = sorted.map(l => {
     const acc = l.ponude.find(p => p.status === 'accepted');
-    const _imgs = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
+    const _imgs = storeImgs('sz'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
     const thumb = _imgs.length
-      ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(_imgs)},0)">`
+      ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();galleryById('sz${l.id}',0)">`
       : '🔧';
     const isPoslato = poslatoSet.has(l.id);
 
@@ -1522,9 +1529,9 @@ async function renderBuyerListings() {
   const moze = canBid();
   el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
-    const images = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
+    const images = storeImgs('b'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
     const thumb = images.length
-      ? `<div class="oglas-img" style="cursor:zoom-in;position:relative" onclick="openGallery(${JSON.stringify(images)},0)">
+      ? `<div class="oglas-img" style="cursor:zoom-in;position:relative" onclick="galleryById('b${l.id}',0)">
            <img src="${images[0]}">
            ${images.length > 1 ? `<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px">📷 ${images.length}</div>` : ''}
          </div>`
@@ -2369,9 +2376,9 @@ async function renderAdminOglasi() {
     }));
   } catch(e) { toast('Greška', 'err'); return; }
   el.innerHTML = LISTINGS.length ? LISTINGS.map(l => {
-    const imgs = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
+    const imgs = storeImgs('a'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
     const thumbHtml = imgs.length
-      ? `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0;cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(imgs)},0)"><img src="${imgs[0]}"></div>`
+      ? `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0;cursor:zoom-in" onclick="event.stopPropagation();galleryById('a${l.id}',0)"><img src="${imgs[0]}"></div>`
       : `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">🔧</div>`;
     return `<div class="admin-card" id="ac-l-${l.id}" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0">
       <div style="display:flex;gap:10px;align-items:center;width:100%" onclick="toggleAdminListing(${l.id})">
@@ -2387,7 +2394,7 @@ async function renderAdminOglasi() {
         ${l.stanje?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Stanje: <b style="color:var(--text)">${l.stanje}</b></div>`:''}
         ${l.nap?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Napomena: ${l.nap}</div>`:''}
         <div style="font-size:12px;color:var(--muted2)">Objavljeno: ${fmtDate(l.createdAt)}</div>
-        ${imgs.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${imgs.map((img,i)=>`<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:5px;cursor:zoom-in" onclick="openGallery(${JSON.stringify(imgs)},${i})">`).join('')}</div>` : ''}
+        ${imgs.length > 0 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${imgs.map((img,i)=>`<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:5px;cursor:zoom-in" onclick="galleryById('a${l.id}',${i})">`).join('')}</div>` : ''}
       </div>
     </div>`;
   }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
