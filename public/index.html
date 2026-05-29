@@ -1079,6 +1079,13 @@ function aTab(n) {
 // UPLOAD
 // ═══════════════════════════════════════════════════════
 function handleDrop(e) { e.preventDefault(); document.getElementById('uz').classList.remove('drag'); handleFiles(e.dataTransfer.files); }
+// Helper: parse images from server (PostgreSQL vraća JSON string)
+function parseImgs(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { return JSON.parse(raw) || []; } catch(e) { return []; }
+}
+
 // Kompresija slike na max 1200px, JPEG quality 0.82
 function compressImage(file) {
   return new Promise(resolve => {
@@ -1190,9 +1197,8 @@ async function renderMyListings() {
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(),
-      ponude: []
+      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
+      createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
   const mine = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
@@ -1206,7 +1212,7 @@ async function renderMyListings() {
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
-    const images = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const images = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
     const thumb = images.length
       ? `<img src="${images[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(images)},0)">`
       : '🔧';
@@ -1381,7 +1387,7 @@ async function renderZavrseni() {
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><h3>Greška</h3></div>'; return; }
@@ -1408,7 +1414,7 @@ async function renderZavrseni() {
 
   el.innerHTML = sorted.map(l => {
     const acc = l.ponude.find(p => p.status === 'accepted');
-    const _imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const _imgs = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
     const thumb = _imgs.length
       ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(_imgs)},0)">`
       : '🔧';
@@ -1474,7 +1480,7 @@ async function renderBuyerListings() {
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
       createdAt: new Date(l.created_at).getTime(),
       ponude: l.my_ponude || []
     }));
@@ -1516,7 +1522,7 @@ async function renderBuyerListings() {
   const moze = canBid();
   el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
-    const images = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const images = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
     const thumb = images.length
       ? `<div class="oglas-img" style="cursor:zoom-in;position:relative" onclick="openGallery(${JSON.stringify(images)},0)">
            <img src="${images[0]}">
@@ -2358,12 +2364,12 @@ async function renderAdminOglasi() {
   try {
     const data = await api('GET', '/listings');
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { toast('Greška', 'err'); return; }
   el.innerHTML = LISTINGS.length ? LISTINGS.map(l => {
-    const imgs = (l.images && l.images.length) ? l.images : (l.thumb ? [l.thumb] : []);
+    const imgs = parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []);
     const thumbHtml = imgs.length
       ? `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0;cursor:zoom-in" onclick="event.stopPropagation();openGallery(${JSON.stringify(imgs)},0)"><img src="${imgs[0]}"></div>`
       : `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">🔧</div>`;
