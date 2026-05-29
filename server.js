@@ -200,6 +200,9 @@ app.get('/api/listings', auth, async (req, res) => {
         GROUP BY l.id, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [parseInt(req.user.id)];
+      const debugResult = await pool.query(query, params);
+      console.log('SELLER listings count:', debugResult.rows.length, 'rows:', JSON.stringify(debugResult.rows.map(r=>({id:r.id,marka:r.marka,status:r.status}))));
+      return res.json(debugResult.rows.map(l => ({ ...l, images: (() => { try { return JSON.parse(l.images||'[]'); } catch(e) { return []; } })() })));
     } else if (req.user.role === 'admin') {
       // Admin vidi SVE oglase bez filtera
       query = `
@@ -242,7 +245,10 @@ app.get('/api/listings', auth, async (req, res) => {
       });
     }
 
-    res.json(result.rows);
+    res.json(result.rows.map(l => ({
+      ...l,
+      images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })()
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Greška pri dohvatu oglasa' });
