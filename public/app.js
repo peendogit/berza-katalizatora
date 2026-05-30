@@ -942,7 +942,7 @@ function renderMyPonude() {
       </div>` : status==='declined' ? `
       <div style="background:var(--rL);border:1px solid rgba(230,57,70,.15);border-radius:7px;padding:10px 12px;margin-top:8px;font-size:13px;color:var(--muted2)">
         Prodavač je odbio vašu ponudu od <b>${mp.cijena} KM</b>.
-        ${canRetry ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openPonudaOvMin(${l.id},'${l.marka} ${l.model}',${lastCijena})">📤 Pošalji novu ponudu</button></div>` : '<div style="margin-top:6px;font-size:12px;color:var(--red)">Iskoristili ste sve pokušaje za ovaj oglas.</div>'}
+
       </div>` : '';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
