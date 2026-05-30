@@ -873,7 +873,8 @@ function renderMyPonude() {
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
     // Pronađi ponudu iz LISTINGS direktno — uvijek ažuran status
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
-    const status=p?p.status:'pending';
+    const rawStatus = p ? p.status : 'pending';
+    const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
     const seller=getOwner(l);
     const myAddr=CU ? getBuyerAddr(CU) : null;
     const stEl = status==='accepted'
@@ -893,7 +894,8 @@ function renderMyPonude() {
         </div>
       </div>` : status==='declined' ? `
       <div style="background:var(--rL);border:1px solid rgba(230,57,70,.15);border-radius:7px;padding:10px 12px;margin-top:8px;font-size:13px;color:var(--muted2)">
-        Prodavač je odbio vašu ponudu od <b>${mp.cijena} KM</b>. Možete kontaktirati prodavača za više informacija.
+        Prodavač je odbio vašu ponudu od <b>${mp.cijena} KM</b>.
+        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Pošalji novu ponudu</button></div>
       </div>` : '';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -1157,7 +1159,12 @@ async function sendChat() {
     await api('POST', '/chat/'+chatLid, { receiver_id, text: txt });
     ta.value=''; ta.style.height='auto';
     updateSendBtn();
-    await loadChatMsgs(chatLid);
+    // Seller mora koristiti loadChatMsgsWithBuyer da ne izgubi historiju
+    if (CU.role === 'seller') {
+      await loadChatMsgsWithBuyer(chatLid, receiver_id);
+    } else {
+      await loadChatMsgs(chatLid);
+    }
     markRead(chatLid);
     updatePorukeBadges();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
