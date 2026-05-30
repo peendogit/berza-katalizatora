@@ -189,7 +189,6 @@ app.get('/api/listings', auth, async (req, res) => {
     let query, params;
 
     if (req.user.role === 'seller') {
-      console.log('SELLER listings request, user.id:', req.user.id, typeof req.user.id);
       query = `
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap, 
                l.images, l.status, l.country, l.created_at,
@@ -204,7 +203,6 @@ app.get('/api/listings', auth, async (req, res) => {
         ORDER BY l.created_at DESC`;
       params = [parseInt(req.user.id)];
       const debugResult = await pool.query(query, params);
-      console.log('SELLER listings count:', debugResult.rows.length, 'rows:', JSON.stringify(debugResult.rows.map(r=>({id:r.id,marka:r.marka,status:r.status,user_id:r.user_id}))));
       return res.json(debugResult.rows.map(l => ({ ...l, images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })() })));
     } else if (req.user.role === 'admin') {
       // Admin vidi SVE oglase bez filtera
