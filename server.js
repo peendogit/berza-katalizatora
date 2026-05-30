@@ -670,6 +670,18 @@ app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
   }
 });
 
+// GET /api/admin/ponude
+app.get('/api/admin/ponude', auth, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT p.*, l.marka, l.model FROM ponude p JOIN listings l ON l.id = p.listing_id ORDER BY p.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // GET /api/admin/stats
 app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
   try {
