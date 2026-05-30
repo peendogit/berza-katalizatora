@@ -149,6 +149,10 @@ async function api(method, path, body) {
   };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch('/api' + path, opts);
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error('Server greška (' + res.status + ')');
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Greška');
   return data;
