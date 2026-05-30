@@ -465,12 +465,20 @@ app.post('/api/ponude', auth, async (req, res) => {
 
     const expires_at = new Date(Date.now() + dani * 86400000);
 
+    // Ako već postoji odbijena ponuda, updateaj je umjesto INSERT
     const result = await pool.query(
       `INSERT INTO ponude (listing_id, buyer_id, cijena, dani, expires_at, status)
        VALUES ($1, $2, $3, $4, $5, 'pending')
+       ON CONFLICT (listing_id, buyer_id) DO UPDATE
+         SET cijena = $3, dani = $4, expires_at = $5, status = 'pending', created_at = NOW()
+       WHERE ponude.status = 'rejected'
        RETURNING *`,
       [listing_id, req.user.id, cijena, dani, expires_at]
     );
+
+    if (!result.rows[0]) {
+      return res.status(400).json({ error: 'Već imate aktivnu ponudu za ovaj oglas' });
+    }
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
