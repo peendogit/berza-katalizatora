@@ -687,18 +687,8 @@ async function renderBuyerListings() {
       (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime() }))
     );
   } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
-  // Sakrij oglas iz aktivnih: pending/accepted ili iskorišten max broj pokušaja (2)
-  const myPonudeById = {};
-  getMyPonude().forEach(p => {
-    if (!myPonudeById[p.lid]) myPonudeById[p.lid] = [];
-    myPonudeById[p.lid].push(p);
-  });
-  const blockedLids = Object.keys(myPonudeById).filter(lid => {
-    const ps = myPonudeById[lid];
-    const hasPendingOrAccepted = ps.some(p => p.status === 'pending' || p.status === 'accepted');
-    const rejectedCount = ps.filter(p => p.status === 'rejected').length;
-    return hasPendingOrAccepted || rejectedCount >= 2;
-  }).map(Number);
+  // Sakrij oglas čim je buyer ikad poslao ponudu (bez obzira na status)
+  const blockedLids = getMyPonude().map(p => p.lid);
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
