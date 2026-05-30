@@ -903,50 +903,28 @@ function renderMyPonude() {
   }
   el.innerHTML=ponudeList.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
-    // Pronađi ponudu iz LISTINGS direktno — uvijek ažuran status
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
-    // Koliko puta je odbijena (iz allMyPonude — brojimo odbijene za ovaj oglas)
-    const myPonudeForListing = getMyPonude().filter(x => x.lid === mp.lid);
-    const rejectedCount = myPonudeForListing.filter(x => x.status === 'rejected').length;
-    const lastCijena = Math.max(...myPonudeForListing.map(x => x.cijena || 0), 0);
-    const canRetry = status === 'declined' && rejectedCount < 2;
-    const seller=getOwner(l);
-    const myAddr=CU ? getBuyerAddr(CU) : null;
-    const stEl = status==='accepted'
-      ? '<span class="badge b-ok" style="font-size:13px;padding:4px 10px">✅ Prihvaćena — prodavač šalje katalizator</span> <button class="btn btn-ghost btn-xs" style="margin-left:6px" onclick="bTab(\"zavrseni\")">→ Detalji</button>'
-      : status==='declined'
-      ? '<span class="badge b-err" style="font-size:13px;padding:4px 10px">❌ Odbijena</span>'
-      : '<span class="badge b-wait" style="font-size:13px;padding:4px 10px">⏳ Čeka odgovor prodavača</span>';
-    const confB = status==='accepted' ? `
-      <div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:7px;padding:14px;margin-top:10px">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--green);margin-bottom:8px">📦 Katalizator se šalje na vašu adresu</div>
-        <div style="font-size:13px;color:var(--muted2);line-height:1.8">
-          ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : 'Vaša registrovana adresa'}
-        </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:8px;border-top:1px solid rgba(29,185,84,.15);padding-top:8px">
-          Dogovorena cijena: <b style="color:var(--green)">${mp.cijena} KM</b>
-          ${mp.dani ? ` · Ponuda bila validna ${mp.dani} ${mp.dani===1?'dan':'dana'}` : ''}
-        </div>
-      </div>` : status==='declined' ? `
-      <div style="background:var(--rL);border:1px solid rgba(230,57,70,.15);border-radius:7px;padding:10px 12px;margin-top:8px;font-size:13px;color:var(--muted2)">
-        Prodavač je odbio vašu ponudu od <b>${mp.cijena} KM</b>.
-
-      </div>` : '';
-    return `<div class="card">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
-          <div style="font-size:12px;color:var(--muted)">📍 ${seller.city}${l.broj?' · Nr. '+l.broj:''}</div>
-        </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:${status==='accepted'?'var(--green)':status==='declined'?'var(--muted)':'var(--orange2)'};flex-shrink:0">${mp.cijena} KM</div>
+    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : 'var(--yellow)';
+    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : '⏳ Na čekanju';
+    const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbSrc = imgs[0] || null;
+    const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
+    const thumb = thumbSrc
+      ? `<img src="${thumbSrc}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0" onclick="${gallJS}">`
+      : `<span style="font-size:20px">🔧</span>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM</div>
       </div>
-      ${stEl}
-      ${confB}
+      <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
     </div>`;
   }).join('');
+  // Wrap u card
+  el.innerHTML = `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;overflow:hidden">${el.innerHTML}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════
