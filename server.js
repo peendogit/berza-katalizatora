@@ -256,7 +256,7 @@ app.get('/api/listings', auth, async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    // Ako je buyer — dodaj i info o vlastitim ponudama
+    // Ako je buyer — dodaj info o vlastitim ponudama + fetchaj završene oglase
     if (req.user.role === 'buyer') {
       const myPonude = await pool.query(
         `SELECT * FROM ponude WHERE buyer_id = $1`, [req.user.id]
@@ -269,6 +269,25 @@ app.get('/api/listings', auth, async (req, res) => {
       result.rows.forEach(l => {
         l.my_ponude = ponudeMap[l.id] || [];
       });
+
+      // Dodaj završene oglase gdje je buyer pobijedio (prihvaćena ponuda)
+      const finishedIds = myPonude.rows
+        .filter(p => p.status === 'accepted')
+        .map(p => p.listing_id);
+      if (finishedIds.length > 0) {
+        const finishedRes = await pool.query(
+          `SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel
+           FROM listings l JOIN users u ON u.id = l.user_id
+           WHERE l.id = ANY($1)`,
+          [finishedIds]
+        );
+        finishedRes.rows.forEach(l => {
+          if (!result.rows.find(r => r.id === l.id)) {
+            l.my_ponude = ponudeMap[l.id] || [];
+            result.rows.push(l);
+          }
+        });
+      }
     }
 
     const response = result.rows.map(l => ({
@@ -545,6 +564,47 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
 // CHAT ROUTES
 // ═══════════════════════════════════════════════════════════
 
+// GET /api/chat/inbox  — sve konverzacije za trenutnog korisnika
+app.get('/api/chat/inbox', auth, async (req, res) => {
+  try {
+    let query, params;
+    if (req.user.role === 'seller') {
+      // Seller vidi sve konverzacije na svojim oglasima
+      query = `SELECT DISTINCT ON (m.listing_id, m.sender_id)
+        m.listing_id, m.sender_id as buyer_id, u.name as buyer_name,
+        l.marka, l.model,
+        (SELECT text FROM messages WHERE listing_id=m.listing_id AND (sender_id=m.sender_id OR receiver_id=m.sender_id) ORDER BY created_at DESC LIMIT 1) as last_text,
+        (SELECT created_at FROM messages WHERE listing_id=m.listing_id AND (sender_id=m.sender_id OR receiver_id=m.sender_id) ORDER BY created_at DESC LIMIT 1) as last_at,
+        (SELECT COUNT(*) FROM messages WHERE listing_id=m.listing_id AND receiver_id=$1 AND sender_id=m.sender_id AND read_at IS NULL) as unread_count
+        FROM messages m
+        JOIN listings l ON l.id = m.listing_id
+        JOIN users u ON u.id = m.sender_id
+        WHERE l.user_id = $1 AND m.sender_id != $1
+        ORDER BY m.listing_id, m.sender_id, last_at DESC`;
+      params = [req.user.id];
+    } else {
+      // Buyer vidi sve konverzacije koje je pokrenuo
+      query = `SELECT DISTINCT ON (m.listing_id)
+        m.listing_id, l.user_id as seller_id, u.name as seller_name,
+        l.marka, l.model,
+        (SELECT text FROM messages WHERE listing_id=m.listing_id AND (sender_id=$1 OR receiver_id=$1) ORDER BY created_at DESC LIMIT 1) as last_text,
+        (SELECT created_at FROM messages WHERE listing_id=m.listing_id AND (sender_id=$1 OR receiver_id=$1) ORDER BY created_at DESC LIMIT 1) as last_at,
+        (SELECT COUNT(*) FROM messages WHERE listing_id=m.listing_id AND receiver_id=$1 AND read_at IS NULL) as unread_count
+        FROM messages m
+        JOIN listings l ON l.id = m.listing_id
+        JOIN users u ON u.id = l.user_id
+        WHERE m.sender_id = $1 OR m.receiver_id = $1
+        ORDER BY m.listing_id, last_at DESC`;
+      params = [req.user.id];
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // GET /api/chat/:listing_id  (dohvati poruke za oglas — između sellera i buyera)
 app.get('/api/chat/:listing_id', auth, async (req, res) => {
   try {
@@ -716,6 +776,25 @@ app.post('/api/upload', auth, upload.array('images', 5), (req, res) => {
 // ─── SPA fallback ─────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ─── DB migration ────────────────────────────────────────
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ`);
+    console.log('✅ DB migration OK');
+  } catch(e) { console.error('Migration error:', e.message); }
+})();
+
+// ─── PUT /api/chat/:listing_id/read  — označi poruke kao pročitane
+app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE messages SET read_at = NOW() WHERE listing_id = $1 AND receiver_id = $2 AND read_at IS NULL`,
+      [req.params.listing_id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch(err) { res.status(500).json({ error: 'Greška' }); }
 });
 
 // ─── Start ────────────────────────────────────────────────
