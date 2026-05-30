@@ -1212,14 +1212,13 @@ async function renderMyListings() {
     return;
   }
   const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id) && l.status==='active');
-  console.log('DEBUG mine:', mine.length, 'CU.id:', CU.id, typeof CU.id, 'LISTINGS uids:', LISTINGS.map(l=>l.uid+'/'+typeof l.uid).join(','));
-  el.innerHTML = `<div style="font-size:11px;color:red;padding:10px">DEBUG: CU.id=${CU.id}(${typeof CU.id}) LISTINGS=${LISTINGS.length} mine=${mine.length} uids=${LISTINGS.slice(0,3).map(l=>l.uid+'('+typeof l.uid+')').join(',')}</div>` + (mine.length ? '' : '');
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
   }
   el.innerHTML = mine.map(l => {
     const pend = parseInt(l.ponuda_count) || 0;
+    const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
