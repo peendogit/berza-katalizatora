@@ -675,6 +675,7 @@ function renderBuyerPage() {
 async function renderBuyerListings() {
   const el = document.getElementById('b-oglasi');
   try {
+    invalidateListingsCache();
     const data = await cachedListings();
     LISTINGS = data.map(l => ({
       ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
@@ -686,8 +687,18 @@ async function renderBuyerListings() {
       (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime() }))
     );
   } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
-  // Sakrij oglas iz aktivnih samo ako ima pending ili accepted ponudu (ne rejected)
-  const blockedLids = getMyPonude().filter(p => p.status === 'pending' || p.status === 'accepted').map(p => p.lid);
+  // Sakrij oglas iz aktivnih: pending/accepted ili iskorišten max broj pokušaja (2)
+  const myPonudeById = {};
+  getMyPonude().forEach(p => {
+    if (!myPonudeById[p.lid]) myPonudeById[p.lid] = [];
+    myPonudeById[p.lid].push(p);
+  });
+  const blockedLids = Object.keys(myPonudeById).filter(lid => {
+    const ps = myPonudeById[lid];
+    const hasPendingOrAccepted = ps.some(p => p.status === 'pending' || p.status === 'accepted');
+    const rejectedCount = ps.filter(p => p.status === 'rejected').length;
+    return hasPendingOrAccepted || rejectedCount >= 2;
+  }).map(Number);
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
