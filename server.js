@@ -463,14 +463,36 @@ app.post('/api/ponude', auth, async (req, res) => {
       return res.status(400).json({ error: 'Ne možete slati ponudu na vlastiti oglas' });
     }
 
+    // Provjeri postojeću ponudu i broj pokušaja
+    const existing = await pool.query(
+      `SELECT * FROM ponude WHERE listing_id = $1 AND buyer_id = $2`,
+      [listing_id, req.user.id]
+    );
+
+    if (existing.rows[0]) {
+      const ex = existing.rows[0];
+      if (ex.status === 'pending' || ex.status === 'accepted') {
+        return res.status(400).json({ error: 'Već imate aktivnu ponudu za ovaj oglas' });
+      }
+      if (ex.status === 'rejected') {
+        const attempts = ex.attempt_count || 1;
+        if (attempts >= 2) {
+          return res.status(400).json({ error: 'Iskoristili ste sve pokušaje za ovaj oglas' });
+        }
+        if (parseFloat(cijena) <= parseFloat(ex.cijena)) {
+          return res.status(400).json({ error: 'Nova ponuda mora biti veća od prethodne (' + ex.cijena + ' KM)' });
+        }
+      }
+    }
+
     const expires_at = new Date(Date.now() + dani * 86400000);
 
-    // Ako već postoji odbijena ponuda, updateaj je umjesto INSERT
     const result = await pool.query(
-      `INSERT INTO ponude (listing_id, buyer_id, cijena, dani, expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending')
+      `INSERT INTO ponude (listing_id, buyer_id, cijena, dani, expires_at, status, attempt_count)
+       VALUES ($1, $2, $3, $4, $5, 'pending', 1)
        ON CONFLICT (listing_id, buyer_id) DO UPDATE
-         SET cijena = $3, dani = $4, expires_at = $5, status = 'pending', created_at = NOW()
+         SET cijena = $3, dani = $4, expires_at = $5, status = 'pending', created_at = NOW(),
+             attempt_count = COALESCE(ponude.attempt_count, 1) + 1
        WHERE ponude.status = 'rejected'
        RETURNING *`,
       [listing_id, req.user.id, cijena, dani, expires_at]
@@ -804,6 +826,7 @@ app.get('*', (req, res) => {
 (async () => {
   try {
     await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE ponude ADD COLUMN IF NOT EXISTS attempt_count INTEGER DEFAULT 1`);
     console.log('✅ DB migration OK');
   } catch(e) { console.error('Migration error:', e.message); }
 })();
