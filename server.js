@@ -569,32 +569,36 @@ app.get('/api/chat/inbox', auth, async (req, res) => {
   try {
     let query, params;
     if (req.user.role === 'seller') {
-      // Seller vidi sve konverzacije na svojim oglasima
-      query = `SELECT DISTINCT ON (m.listing_id, m.sender_id)
-        m.listing_id, m.sender_id as buyer_id, u.name as buyer_name,
-        l.marka, l.model,
-        (SELECT text FROM messages WHERE listing_id=m.listing_id AND (sender_id=m.sender_id OR receiver_id=m.sender_id) ORDER BY created_at DESC LIMIT 1) as last_text,
-        (SELECT created_at FROM messages WHERE listing_id=m.listing_id AND (sender_id=m.sender_id OR receiver_id=m.sender_id) ORDER BY created_at DESC LIMIT 1) as last_at,
-        (SELECT COUNT(*) FROM messages WHERE listing_id=m.listing_id AND receiver_id=$1 AND sender_id=m.sender_id AND read_at IS NULL) as unread_count
+      query = `
+        SELECT m.listing_id,
+               m.sender_id as buyer_id,
+               u.name as buyer_name,
+               l.marka, l.model,
+               MAX(m.created_at) as last_at,
+               (SELECT text FROM messages m2 WHERE m2.listing_id=m.listing_id AND m2.sender_id=m.sender_id ORDER BY m2.created_at DESC LIMIT 1) as last_text,
+               COUNT(CASE WHEN m.receiver_id=$1 AND m.read_at IS NULL THEN 1 END) as unread_count
         FROM messages m
         JOIN listings l ON l.id = m.listing_id
         JOIN users u ON u.id = m.sender_id
         WHERE l.user_id = $1 AND m.sender_id != $1
-        ORDER BY m.listing_id, m.sender_id, last_at DESC`;
+        GROUP BY m.listing_id, m.sender_id, u.name, l.marka, l.model
+        ORDER BY last_at DESC`;
       params = [req.user.id];
     } else {
-      // Buyer vidi sve konverzacije koje je pokrenuo
-      query = `SELECT DISTINCT ON (m.listing_id)
-        m.listing_id, l.user_id as seller_id, u.name as seller_name,
-        l.marka, l.model,
-        (SELECT text FROM messages WHERE listing_id=m.listing_id AND (sender_id=$1 OR receiver_id=$1) ORDER BY created_at DESC LIMIT 1) as last_text,
-        (SELECT created_at FROM messages WHERE listing_id=m.listing_id AND (sender_id=$1 OR receiver_id=$1) ORDER BY created_at DESC LIMIT 1) as last_at,
-        (SELECT COUNT(*) FROM messages WHERE listing_id=m.listing_id AND receiver_id=$1 AND read_at IS NULL) as unread_count
+      query = `
+        SELECT m.listing_id,
+               l.user_id as seller_id,
+               u.name as seller_name,
+               l.marka, l.model,
+               MAX(m.created_at) as last_at,
+               (SELECT text FROM messages m2 WHERE m2.listing_id=m.listing_id AND (m2.sender_id=$1 OR m2.receiver_id=$1) ORDER BY m2.created_at DESC LIMIT 1) as last_text,
+               COUNT(CASE WHEN m.receiver_id=$1 AND m.read_at IS NULL THEN 1 END) as unread_count
         FROM messages m
         JOIN listings l ON l.id = m.listing_id
         JOIN users u ON u.id = l.user_id
         WHERE m.sender_id = $1 OR m.receiver_id = $1
-        ORDER BY m.listing_id, last_at DESC`;
+        GROUP BY m.listing_id, l.user_id, u.name, l.marka, l.model
+        ORDER BY last_at DESC`;
       params = [req.user.id];
     }
     const result = await pool.query(query, params);
