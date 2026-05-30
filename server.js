@@ -8,6 +8,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { Pool } = require('pg');
+const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -31,6 +32,7 @@ function buildPoolConfig() {
 const pool = new Pool(buildPoolConfig());
 
 // ─── Middleware ───────────────────────────────────────────
+app.use(compression());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGIN || 'https://berzakatalizatora.com',
   credentials: true
@@ -79,6 +81,16 @@ function adminOnly(req, res, next) {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Zabranjen pristup' });
   next();
 }
+
+// ─── Server-side cache ───────────────────────────────────────
+const _serverCache = {};
+function getCached(key) {
+  const entry = _serverCache[key];
+  if (entry && (Date.now() - entry.ts) < 30000) return entry.data;
+  return null;
+}
+function setCache(key, data) { _serverCache[key] = { data, ts: Date.now() }; }
+function invalidateCache(key) { delete _serverCache[key]; }
 
 // ═══════════════════════════════════════════════════════════
 // AUTH ROUTES
@@ -186,6 +198,13 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 // GET /api/listings  (buyers i admin vide sve aktivne; seller vidi svoje)
 app.get('/api/listings', auth, async (req, res) => {
   try {
+    // Cache key po roli i kontekstu
+    const cacheKey = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
+                   : req.user.role === 'admin'  ? 'listings_admin'
+                   : `listings_buyer_${req.user.country||'BA'}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     let query, params;
 
     if (req.user.role === 'seller') {
@@ -252,10 +271,15 @@ app.get('/api/listings', auth, async (req, res) => {
       });
     }
 
-    res.json(result.rows.map(l => ({
+    const response = result.rows.map(l => ({
       ...l,
       images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })()
-    })));
+    }));
+    const cacheKey2 = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
+                    : req.user.role === 'admin'  ? 'listings_admin'
+                    : `listings_buyer_${req.user.country||'BA'}`;
+    setCache(cacheKey2, response);
+    res.json(response);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Greška pri dohvatu oglasa' });
@@ -323,6 +347,8 @@ app.post('/api/listings', auth, async (req, res) => {
        JSON.stringify(images||[]), req.user.country || 'BA']
     );
 
+        // Invalidate listings cache
+    Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -342,6 +368,8 @@ app.delete('/api/listings/:id', auth, async (req, res) => {
     }
 
     await pool.query('UPDATE listings SET status = $1 WHERE id = $2', ['deleted', req.params.id]);
+        // Invalidate listings cache
+    Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška pri brisanju' });
@@ -477,6 +505,8 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
       `UPDATE listings SET status = 'finished', accepted_ponuda_id = $1 WHERE id = $2`,
       [req.params.id, ponuda.rows[0].listing_id]
     );
+        // Invalidate listings cache
+    Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
 
     res.json({ ok: true });
   } catch (err) {
