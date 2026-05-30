@@ -362,6 +362,10 @@ async function submitListing() {
       uploads.forEach(f => fd.append('images', f));
       const token = localStorage.getItem('token');
       const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+      if (!upRes.ok) {
+        const errText = await upRes.text();
+        throw new Error('Upload greška: ' + (errText.includes('{') ? JSON.parse(errText).error : 'Pokušajte ponovo'));
+      }
       const upData = await upRes.json();
       if (upData.urls) imageUrls = upData.urls;
     }
@@ -436,7 +440,10 @@ async function renderMyListings() {
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
-    const thumb = l.thumb ? `<img src="${l.thumb}" loading="lazy">` : '🔧';
+    const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbSrc = imgs[0] || null;
+    const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
     const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
@@ -589,7 +596,10 @@ async function renderZavrseni() {
     const acc   = l.ponude.find(p => p.status === 'accepted');
     const buyer = acc ? { name: acc.buyer_name||'Kupac', city: acc.buyer_city||'—', tel: acc.buyer_tel||'—' } : null;
     const addr  = acc ? getBuyerAddr(acc) : null;
-    const thumb = l.thumb ? `<img src="${l.thumb}" loading="lazy">` : '🔧';
+    const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbSrc = imgs[0] || null;
+    const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
     const isPoslato = poslatoSet.has(l.id);
     const isOpen = !isPoslato; // neposlato je defaultno otvoreno
 
@@ -699,7 +709,10 @@ async function renderBuyerListings() {
   const moze = canBid();
   el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
-    const thumb = l.thumb ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${l.thumb}')"><img src="${l.thumb}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
+    const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbSrc = imgs[0] || null;
+    const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const ponudaBtn = moze
@@ -819,7 +832,10 @@ async function renderBuyerZavrseni() {
     const acc = (l.my_ponude||[]).find(p => p.status === 'accepted');
     const seller = getOwner(l);
     const myAddr = CU ? getBuyerAddr(CU) : null;
-    const thumb = l.thumb ? `<img src="${l.thumb}">` : '🔧';
+    const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+    const thumbSrc = imgs[0] || null;
+    const gallB = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '🔧';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px;flex-shrink:0">${thumb}</div>
@@ -939,7 +955,8 @@ async function loadChatMsgs(lid) {
     const buyerMsg = chatHistory[lid].find(m => m.from === 'buyer');
     if (buyerMsg) chatHistory[lid]._buyerId = buyerMsg.senderId;
   } catch(e) {
-    chatHistory[lid] = [];
+    // Ne briši postojeću historiju pri grešci
+    if (!chatHistory[lid]) chatHistory[lid] = [];
   }
   renderChatMsgs();
 }
@@ -1014,6 +1031,18 @@ function updatePorukeBadges() {
 let _badgePollInterval = null;
 function startBadgePoll() {
   if (_badgePollInterval) return;
+  // Odmah fetchaj badges
+  (async () => {
+    try {
+      const inbox = await api('GET', '/chat/inbox');
+      inbox.forEach(c => {
+        const key = CU.id + ':' + c.listing_id;
+        if (parseInt(c.unread_count) > 0) unreadLids.add(key);
+        else unreadLids.delete(key);
+      });
+      updatePorukeBadges();
+    } catch(e) {}
+  })();
   _badgePollInterval = setInterval(async () => {
     if (!CU) return;
     try {
@@ -1027,7 +1056,7 @@ function startBadgePoll() {
       });
       if (changed || inbox.length) updatePorukeBadges();
     } catch(e) {}
-  }, 30000);
+  }, 20000);
 }
 
 
@@ -1062,10 +1091,50 @@ async function sendChatImg(input) {
   input.value = '';
 }
 
-function openLightbox(src) {
-  document.getElementById('lightbox-img').src = src;
+let _lbGallery = [];
+let _lbIdx = 0;
+
+function openLightbox(src, gallery) {
+  _lbGallery = gallery && gallery.length ? gallery : [src];
+  _lbIdx = _lbGallery.indexOf(src);
+  if (_lbIdx < 0) _lbIdx = 0;
+  _lbRender();
   document.getElementById('lightbox').classList.add('on');
 }
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('on');
+  _lbGallery = []; _lbIdx = 0;
+}
+
+function lbNav(dir) {
+  _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
+  _lbRender();
+}
+
+function _lbRender() {
+  document.getElementById('lightbox-img').src = _lbGallery[_lbIdx];
+  const multi = _lbGallery.length > 1;
+  const prev = document.getElementById('lb-prev');
+  const next = document.getElementById('lb-next');
+  const ctr  = document.getElementById('lb-counter');
+  if (prev) prev.style.display = multi ? 'flex' : 'none';
+  if (next) next.style.display = multi ? 'flex' : 'none';
+  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx+1) + ' / ' + _lbGallery.length; }
+}
+
+// Zatvori klik na pozadinu
+document.addEventListener('click', e => {
+  if (e.target.id === 'lightbox') closeLightbox();
+});
+// Strelice na tastaturi
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('lightbox');
+  if (!lb || !lb.classList.contains('on')) return;
+  if (e.key === 'ArrowLeft')  lbNav(-1);
+  if (e.key === 'ArrowRight') lbNav(1);
+  if (e.key === 'Escape')     closeLightbox();
+});
 
 async function sendChat() {
   const ta=document.getElementById('chat-ta');
@@ -1688,25 +1757,58 @@ async function renderPoruke() {
   });
 }
 
-function openSellerChat(lid) {
-  // Otvori chat kao seller (suprotna strana)
+async function openSellerChat(lid) {
   chatLid = lid;
   const l = LISTINGS.find(x => x.id === lid);
-  // Pronađi ko je pisao (buyer)
-  const msgs = chatHistory[lid] || [];
-  const buyerMsg = msgs.find(m => m.from === 'buyer');
-  const buyerName = buyerMsg ? (buyerMsg.buyerName || 'Otkupljivač') : 'Otkupljivač';
-  const buyerId   = buyerMsg ? (buyerMsg.buyerId || 'x') : 'x';
-  document.getElementById('ch-av').textContent = initials(buyerName);
-  document.getElementById('ch-av').style.background = avCol(buyerId);
-  document.getElementById('ch-name').textContent = buyerName + ' · ' + l.marka + ' ' + l.model;
+  document.getElementById('ov-chat').classList.add('on');
   const ta = document.getElementById('chat-ta');
   ta.value = ''; ta.style.height = 'auto';
   updateSendBtn();
-  // Render poruka iz seller perspektive
-  renderSellerChatMsgs(lid, buyerName, buyerId);
-  document.getElementById('ov-chat').classList.add('on');
+  // Fetchaj poruke iz API
+  const hist = chatHistory[lid] || [];
+  const buyerIdFromHist = hist._buyerId || (hist.find(m => m.from === 'buyer') || {}).senderId;
+  // Ako imamo buyer_id iz historije, fetchaj
+  if (buyerIdFromHist) {
+    await loadChatMsgsWithBuyer(lid, buyerIdFromHist);
+  } else {
+    // Učitaj inbox da nađemo buyer_id
+    try {
+      const inbox = await api('GET', '/chat/inbox');
+      const conv = inbox.find(c => parseInt(c.listing_id) === lid);
+      if (conv) await loadChatMsgsWithBuyer(lid, conv.buyer_id);
+    } catch(e) {}
+  }
+  const msgs2 = chatHistory[lid] || [];
+  const bMsg = msgs2.find(m => m.from === 'buyer');
+  const buyerName = bMsg ? bMsg.senderName : 'Otkupljivač';
+  const buyerId   = (chatHistory[lid]||{})._buyerId || (bMsg||{}).senderId || 'x';
+  document.getElementById('ch-av').textContent = initials(buyerName);
+  document.getElementById('ch-av').style.background = avCol(String(buyerId));
+  document.getElementById('ch-name').textContent = buyerName + ' · ' + (l ? l.marka + ' ' + l.model : '');
+  api('PUT', '/chat/'+lid+'/read').catch(()=>{});
+  markRead(lid);
+  updatePorukeBadges();
   setTimeout(() => ta.focus(), 150);
+}
+
+async function loadChatMsgsWithBuyer(lid, buyerId) {
+  try {
+    const msgs = await api('GET', '/chat/'+lid+'?buyer_id='+buyerId);
+    const l = LISTINGS.find(x => x.id === lid);
+    const sellerUid = l ? (l.uid || l.user_id) : CU.id;
+    chatHistory[lid] = msgs.map(m => ({
+      senderId: m.sender_id,
+      senderName: m.sender_name,
+      from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
+      msg: m.text || '',
+      imgUrl: m.image_url || null,
+      time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
+    }));
+    chatHistory[lid]._buyerId = buyerId;
+  } catch(e) {
+    if (!chatHistory[lid]) chatHistory[lid] = [];
+  }
+  renderChatMsgs();
 }
 
 function renderSellerChatMsgs(lid, buyerName, buyerId) {
