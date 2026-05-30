@@ -236,8 +236,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .pending-wall{background:linear-gradient(135deg,#100e00,#001008);border:1.5px solid rgba(244,196,48,.2);border-radius:12px;padding:32px 20px;text-align:center;max-width:420px;margin:40px auto;}
 
 /* DEV MENU */
-.dev-opt{padding:9px 14px;font-size:13px;cursor:pointer;transition:background .12s;}
-.dev-opt:hover{background:rgba(255,255,255,.06);}
+
 
 /* APP WRAP */
 .app-wrap{max-width:1100px;margin:0 auto;padding:24px 18px;}
@@ -399,7 +398,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
   <div class="hdr-r" style="gap:8px">
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Promijeni temu">🌙</button>
     <div id="hdr-guest">
-      <button class="btn btn-primary" onclick="showLoginPage()">Prijava</button>
+      <button class="btn btn-primary" onclick="showLoginPage()">Prijavi se</button>
     </div>
     <div id="hdr-user" style="display:none;align-items:center;gap:8px">
       <div class="uc" onclick="openProfil()">
@@ -413,7 +412,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 
 <!-- ═══ HERO ═══ -->
 <div class="page" id="page-hero">
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 52px);text-align:center;padding:0 18px 24px">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:calc(100vh - 52px);text-align:center;padding:48px 18px 24px">
     <div style="background:var(--oL);border:1px solid rgba(255,94,20,.25);color:var(--orange);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:16px;display:inline-block">Bosna i Hercegovina · Srbija</div>
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(52px,11vw,96px);line-height:.92;letter-spacing:-2px;margin-bottom:18px">BERZA<br><span style="color:var(--orange)">KATALIZATORA</span></div>
     <p style="font-size:16px;color:var(--muted2);max-width:480px;line-height:1.65;margin-bottom:32px">Objavi katalizator — verificirani otkupljivači šalju ponude direktno. Bez posrednika.</p>
@@ -432,12 +431,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-align:center;margin-bottom:4px">BERZA <span style="color:var(--orange)">KATALIZATORA</span></div>
       <div style="text-align:center;font-size:13px;color:var(--muted2);margin-bottom:22px">Prijavite se</div>
       <div class="fg"><label>Email</label><input id="in-email" type="email" placeholder="vas@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <div class="fg"><label>Lozinka</label>
-        <div style="position:relative">
-          <input id="in-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:42px">
-          <button type="button" onclick="togglePassVis('in-pass','eye-login')" id="eye-login" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;color:var(--muted);line-height:1;opacity:.5">👁</button>
-        </div>
-      </div>
+      <div class="fg"><label>Lozinka</label><input id="in-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.9">Demo: <b>prodavac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>otkupljivac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>admin@berza.ba</b> / admin</p>
       <button class="btn btn-primary btn-block" onclick="doLogin()">Prijavi se</button>
       <div class="divider"></div>
       <div style="text-align:center;font-size:13px;color:var(--muted2)">Nemate nalog? <button onclick="showRegisterPage()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;font-family:Barlow,sans-serif">Registrujte se →</button></div>
@@ -475,8 +470,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div class="row2">
         <div class="fg"><label>Država *</label>
           <select id="reg-country" onchange="onCountryChange('reg-country','reg-city')">
-            <option value="BA">🇧🇦 Bosna i Hercegovina</option>
-            <option value="RS">🇷🇸 Srbija</option>
+            <option value="ba">Bosna i Hercegovina</option>
+            <option value="rs">Srbija</option>
           </select>
         </div>
         <div class="fg"><label>Grad *</label>
@@ -525,10 +520,9 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
     </div>
     <div id="buyer-content" style="display:none">
       <div class="nav-tabs">
-        <button class="nt on" id="bt-oglasi"   onclick="bTab('oglasi')">Aktivni oglasi</button>
-        <button class="nt"    id="bt-moje"     onclick="bTab('moje')">Moje ponude</button>
-        <button class="nt"    id="bt-zavrseni" onclick="bTab('zavrseni')">Završeni</button>
-        <button class="nt"    id="bt-poruke"   onclick="bTab('poruke')">Poruke <span id="b-poruke-badge" style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
+        <button class="nt on" id="bt-oglasi"  onclick="bTab('oglasi')">Aktivni oglasi</button>
+        <button class="nt"    id="bt-moje"    onclick="bTab('moje')">Moje ponude</button>
+        <button class="nt"    id="bt-poruke"  onclick="bTab('poruke')">Poruke <span id="b-poruke-badge" style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
       </div>
       <div class="tab-pane on" id="bp-oglasi">
         <div class="sort-bar" id="sort-bar">
@@ -542,7 +536,6 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
         <div id="b-oglasi"></div>
       </div>
       <div class="tab-pane"    id="bp-moje"><div id="b-moje"></div></div>
-      <div class="tab-pane"    id="bp-zavrseni"><div id="b-zavrseni"></div></div>
       <div class="tab-pane"    id="bp-poruke"><div id="b-poruke"></div></div>
     </div>
   </div>
@@ -556,23 +549,19 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px">Admin panel</span>
     </div>
     <div class="nav-tabs">
-      <button class="nt on" id="at-users"     onclick="aTab('users')">Korisnici <span id="admin-badge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
-      <button class="nt"    id="at-oglasi"    onclick="aTab('oglasi')">Oglasi</button>
-      <button class="nt"    id="at-analitika" onclick="aTab('analitika')">📊 Analitika</button>
+      <button class="nt on" id="at-users"  onclick="aTab('users')">Korisnici <span id="admin-badge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
+      <button class="nt"    id="at-oglasi" onclick="aTab('oglasi')">Oglasi</button>
     </div>
     <div class="tab-pane on" id="ap-users">
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <button class="btn btn-primary btn-xs" id="af-all"    onclick="setAdminFilter('all')">Svi</button>
         <button class="btn btn-ghost btn-xs"   id="af-seller" onclick="setAdminFilter('seller')">Prodavači</button>
         <button class="btn btn-ghost btn-xs"   id="af-buyer"  onclick="setAdminFilter('buyer')">Otkupljivači</button>
-        <button class="btn btn-ghost btn-xs"   id="af-BA"     onclick="setAdminFilter('BA')">🇧🇦 BiH</button>
-        <button class="btn btn-ghost btn-xs"   id="af-RS"     onclick="setAdminFilter('RS')">🇷🇸 Srbija</button>
       </div>
       <div class="fg" style="margin-bottom:12px"><input id="admin-search" placeholder="🔍 Pretraži (ime, email, grad)..." oninput="renderAdminUsers()"></div>
       <div id="a-users"></div>
     </div>
     <div class="tab-pane" id="ap-oglasi"><div id="a-oglasi"></div></div>
-    <div class="tab-pane" id="ap-analitika"><div id="a-analitika"></div></div>
   </div>
 </div>
 
@@ -584,26 +573,27 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
   <div class="sheet" style="max-width:560px;max-height:90vh">
     <button class="sheet-close" onclick="closeOv('ov-novi')">✕</button>
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;margin-bottom:16px">+ Novi oglas</div>
-    <div class="fg"><label>Broj katalizatora (OEM / serijski) <span style="color:var(--muted);font-weight:400;font-size:11px">— opcija</span></label><input id="f-broj" placeholder="npr. 8946202200, 5Z0131701..."></div>
+    <div class="fg"><label>Broj katalizatora (OEM / serijski)</label><input id="f-broj" placeholder="npr. 8946202200, 5Z0131701..."></div>
     <div class="row2">
       <div class="fg"><label>Marka vozila *</label><input id="f-marka" placeholder="npr. Toyota"></div>
-      <div class="fg"><label>Model <span style="color:var(--muted);font-weight:400;font-size:11px">— opcija</span></label><input id="f-model" placeholder="npr. Corolla 1.6"></div>
+      <div class="fg"><label>Model</label><input id="f-model" placeholder="npr. Corolla 1.6"></div>
     </div>
     <div class="row2">
-      <div class="fg"><label>Godište <span style="color:var(--muted);font-weight:400;font-size:11px">— opcija</span></label><input id="f-god" placeholder="npr. 2004"></div>
+      <div class="fg"><label>Godište</label><input id="f-god" placeholder="npr. 2004"></div>
       <div class="fg"><label>Stanje</label>
         <select id="f-stanje"><option>Originalni — neoštećen</option><option>Malo oštećen</option><option>Zapušen / pokvaren</option><option>Nepoznato</option></select>
       </div>
     </div>
-    <div class="fg"><label>Napomena <span style="color:var(--muted);font-weight:400;font-size:11px">— opcija</span></label><textarea id="f-nap" rows="2" placeholder="Dodatne info za otkupljivače..."></textarea></div>
+    <div class="fg"><label>Napomena</label><textarea id="f-nap" rows="2" placeholder="Dodatne info za otkupljivače..."></textarea></div>
     <div class="upload-zone" id="uz" onclick="document.getElementById('file-in').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)" style="padding:18px;margin-bottom:12px">
       <input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
+      <input type="file" id="chat-img-in" accept="image/*" style="display:none" onchange="sendChatImg(this)">
       <div style="font-size:28px;margin-bottom:4px">📷</div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;margin-bottom:2px">Dodajte slike (opcija)</div>
       <div style="font-size:11px;color:var(--muted)">Kliknite ili prevucite</div>
       <div class="prev-grid" id="prev-grid" onclick="event.stopPropagation()"></div>
     </div>
-    <button class="btn btn-primary btn-block" id="novi-submit-btn" onclick="submitListing()">📤 Objavi oglas</button>
+    <button class="btn btn-primary btn-block" onclick="submitListing()">📤 Objavi oglas</button>
   </div>
 </div>
 
@@ -747,47 +737,40 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 <div class="ctx-menu" id="ctx-menu">
   <div class="ctx-item danger" onclick="deleteConvo()">🗑 Izbriši razgovor</div>
 </div>
-<div class="lightbox" id="lightbox" onclick="if(event.target===this||event.target.id==='lightbox')closeLightbox()">
-  <button onclick="lbNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;z-index:2" id="lb-prev">‹</button>
-  <div style="position:relative;max-width:92vw;max-height:88vh">
-    <img id="lightbox-img" src="" style="max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6);display:block">
-    <div id="lb-counter" style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:3px 8px;border-radius:10px"></div>
-  </div>
-  <button onclick="lbNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;z-index:2" id="lb-next">›</button>
-  <button onclick="closeLightbox()" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:2">✕</button>
-</div>
+<div class="lightbox" id="lightbox" onclick="document.getElementById('lightbox').classList.remove('on')"><img id="lightbox-img" src=""></div>
 <div class="toast" id="toast"></div>
-<input type="file" id="chat-img-in" accept="image/*" style="display:none" onchange="sendChatImg(this)">
 <button class="fab" id="fab" onclick="openNoviOglas()" title="Novi oglas">+</button>
 
 <script>
 // ═══════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════
-let USERS = [
-  {id:'u1', email:'prodavac@test.ba',    pass:'1234',  name:'Mirko Perić',         city:'Sarajevo', addr:'Ul. Titova 5',        tel:'+387 61 111 222', role:'seller', status:'approved', premium:false},
-  {id:'u2', email:'otkupljivac@test.ba', pass:'1234',  name:'AutoKat d.o.o.',       city:'Mostar',   addr:'Industrijska zona bb', tel:'+387 36 333 444', role:'buyer',  status:'approved', premium:true,  premiumUntil:Date.now()+365*86400000, premium:true},
-  {id:'u3', email:'admin@berza.ba',      pass:'admin', name:'Admin',                city:'',              addr:'',                    tel:'',                role:'admin',  status:'approved', premium:false},
-  {id:'u4', email:'pgm@example.ba',      pass:'1234',  name:'PGM Reciklaža d.o.o.', city:'Zenica',   addr:'Metalurška 22',       tel:'+387 32 555 666', role:'buyer',  status:'approved', premium:true,  premiumUntil:Date.now()+365*86400000},
-  {id:'u5', email:'novi@test.ba',        pass:'1234',  name:'KatOtkup Tuzla',       city:'Tuzla',    addr:'Rudarska 8',          tel:'+387 35 777 888', role:'buyer',  status:'pending',  premium:false}
-];
+// USERS — populira se iz API pri admin učitavanju
+let USERS = [];
 
-const BUYER_ADDR = {
-  'u2': {name:'AutoKat d.o.o.',         addr:'Industrijska zona bb', city:'Mostar',  tel:'+387 36 333 444'},
-  'u4': {name:'PGM Reciklaža d.o.o.',   addr:'Metalurška 22',        city:'Zenica',  tel:'+387 32 555 666', note:'Pakujte u kartonsku kutiju.'}
-};
+// BUYER_ADDR — dinamički iz API (CU korisnik ili buyer podaci iz ponude)
+// getBuyerAddr(buyerObj) vraća adresu iz API objekta
+function getBuyerAddr(b) {
+  if (!b) return null;
+  if (!b.addr && !b.city && !b.tel) return null;
+  return { name: b.name||b.buyer_name||'Kupac', addr: b.addr||b.buyer_addr||'', city: b.city||b.buyer_city||'', tel: b.tel||b.buyer_tel||'' };
+}
 
-let LISTINGS = [
-  {id:1, uid:'u1', broj:'8946202200', marka:'Toyota', model:'Corolla 1.6', god:'2004', stanje:'Originalni — neoštećen', nap:'Izvađen iz automobila koji ide na otpad, tek prošao tehnički', thumb:null, status:'active', createdAt:Date.now()-2*86400000,
-   ponude:[
-     {id:'p1', buyerId:'u2', cijena:155, msg:'Zainteresovani, nudimo 155 KM. Brza isplata.', time:'14:32', status:'pending'},
-     {id:'p2', buyerId:'u4', cijena:148, msg:'148 KM gotovinom.', time:'12:15', status:'pending'}
-   ]},
-  {id:2, uid:'u1', broj:'18307505209', marka:'BMW', model:'E46 318i', god:'2001', stanje:'Malo oštećen', nap:'Pukao na rubu, ali jezgra ispravna', thumb:null, status:'active', createdAt:Date.now()-1*86400000, ponude:[]},
-  {id:3, uid:'x1', broj:'A2114900514', marka:'Mercedes-Benz', model:'C200 W203', god:'2005', stanje:'Originalni — neoštećen', nap:'', thumb:null, status:'active', createdAt:Date.now()-3*86400000,
-   ponude:[{id:'p3', buyerId:'u2', cijena:195, msg:'', time:'09:45', status:'pending'}]},
-  {id:4, uid:'x2', broj:'1J0131701P', marka:'Volkswagen', model:'Golf IV 1.9 TDI', god:'2002', stanje:'Zapušen / pokvaren', nap:'', thumb:null, status:'active', createdAt:Date.now(), ponude:[]}
-];
+let LISTINGS = [];
+
+// ─── Cache ────────────────────────────────────────────────
+// listings cache: {data, ts} — važi 30s
+const _cache = {};
+async function cachedListings(force=false) {
+  const now = Date.now();
+  if (!force && _cache.listings && (now - _cache.listings.ts) < 30000) {
+    return _cache.listings.data;
+  }
+  const data = await api('GET', '/listings');
+  _cache.listings = { data, ts: now };
+  return data;
+}
+function invalidateListingsCache() { delete _cache.listings; }
 
 let CU = null;
 let selRole = 'seller';
@@ -850,10 +833,10 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => u.id === id);
-const getOwner = l  => USERS.find(u => u.id === l.uid) || {name:'Nepoznat', city:'—', tel:'—', id:'x'};
+const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: l.owner_name||'Nepoznat', city: l.owner_city||'—', tel: l.owner_tel||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
-const avCol    = id => { const s = String(id||'x'); return avColors[s.charCodeAt(s.length-1) % avColors.length]; };
+const avCol    = id => avColors[(id||'x').charCodeAt((id||'x').length-1) % avColors.length];
 const now8     = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); };
 
@@ -874,8 +857,8 @@ function showRegisterPage() { showPage('page-register'); setTimeout(() => initAC
 function goHome() {
   if (!CU) { showPage('page-hero'); return; }
   if (CU.role === 'admin')        { showPage('page-admin');  aTab('users'); }
-  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('oglasi'); }
-  else                            { showPage('page-buyer');  bTab('oglasi'); }
+  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('novi'); }
+  else                            { showPage('page-buyer'); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -894,9 +877,6 @@ function closeOv(id) {
 }
 
 // ═══════════════════════════════════════════════════════
-// DEV MODE
-// ═══════════════════════════════════════════════════════
-
 // ═══════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════
@@ -907,19 +887,11 @@ async function api(method, path, body) {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }
   };
-  if (body && method !== 'GET') opts.body = JSON.stringify(body);
+  if (body) opts.body = JSON.stringify(body);
   const res = await fetch('/api' + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Greška');
   return data;
-}
-
-function togglePassVis(inputId, btnId) {
-  const inp = document.getElementById(inputId);
-  const btn = document.getElementById(btnId);
-  if (!inp) return;
-  if (inp.type === 'password') { inp.type = 'text'; if (btn) btn.style.opacity = '1'; }
-  else { inp.type = 'password'; if (btn) btn.style.opacity = '.5'; }
 }
 
 async function doLogin() {
@@ -952,8 +924,7 @@ async function doRegister() {
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const country = document.getElementById('reg-country').value || 'BA';
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole, country });
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
     localStorage.setItem('token', token);
     loginUser(user);
     if (user.status === 'pending') toast('✅ Registracija uspješna! Čekate odobrenje admina.', 'ok');
@@ -1054,80 +1025,64 @@ function sTab(n) {
 
 function bTab(n) {
   pushNav({page:'page-buyer', btab:n});
-  ['oglasi','moje','zavrseni','poruke'].forEach(x => {
+  ['oglasi','moje','poruke'].forEach(x => {
     const t=document.getElementById('bt-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('bp-'+x); if(p) p.classList.toggle('on',x===n);
   });
-  if (n==='oglasi')   renderBuyerListings();
-  if (n==='moje')     renderMyPonude();
-  if (n==='zavrseni') renderBuyerZavrseni();
-  if (n==='poruke')   { markAllPorukeRead('buyer'); renderBuyerPoruke(); }
+  if (n==='oglasi') renderBuyerListings();
+  if (n==='moje')   renderMyPonude();
+  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke(); }
 }
 
 function aTab(n) {
   pushNav({page:'page-admin', atab:n});
-  ['users','oglasi','analitika'].forEach(x => {
+  ['users','oglasi'].forEach(x => {
     const t=document.getElementById('at-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('ap-'+x); if(p) p.classList.toggle('on',x===n);
   });
-  if (n==='users')     renderAdminUsers();
-  if (n==='oglasi')    renderAdminOglasi();
-  if (n==='analitika') renderAnalitika();
+  if (n==='users')  renderAdminUsers();
+  if (n==='oglasi') renderAdminOglasi();
 }
 
 // ═══════════════════════════════════════════════════════
 // UPLOAD
 // ═══════════════════════════════════════════════════════
 function handleDrop(e) { e.preventDefault(); document.getElementById('uz').classList.remove('drag'); handleFiles(e.dataTransfer.files); }
-// Helper: parse images from server (PostgreSQL vraća JSON string)
-function parseImgs(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw) || []; } catch(e) { return []; }
-}
-
-// Globalna mapa slika za lightbox (izbjegava JSON.stringify u onclick)
-const _imgStore = {};
-function storeImgs(lid, imgs) { _imgStore[lid] = imgs; return imgs; }
-function galleryById(lid, idx) { openGallery(_imgStore[lid] || [], idx); }
-
-// Kompresija slike na max 1200px, JPEG quality 0.82
-function compressImage(file) {
+// Resize slike na max 1200px i kompresuj na 0.82 quality prije uploada
+async function resizeImage(file, maxPx=1200, quality=0.82) {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const MAX = 1200;
-      let w = img.width, h = img.height;
-      if (w > MAX || h > MAX) {
-        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-        else       { w = Math.round(w * MAX / h); h = MAX; }
-      }
+      let {width: w, height: h} = img;
+      if (w <= maxPx && h <= maxPx) { resolve(file); return; }
+      const scale = maxPx / Math.max(w, h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })), 'image/jpeg', 0.82);
+      canvas.toBlob(blob => resolve(new File([blob], file.name, {type:'image/jpeg'})), 'image/jpeg', quality);
     };
-    img.onerror = () => resolve(file); // fallback bez kompresije
     img.src = url;
   });
 }
 
-function handleFiles(files) {
-  for (const f of files) if (f.type.startsWith('image/')) uploads.push(f);
-  renderPreviews();
-}
-
-function renderPreviews() {
+async function handleFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const resized = await resizeImage(f);
+    uploads.push(resized);
+  }
   document.getElementById('prev-grid').innerHTML = uploads.map((f,i)=>
     `<div class="prev-item"><img src="${URL.createObjectURL(f)}"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${i})">✕</button></div>`
   ).join('');
 }
-
 function rmFile(i) {
   uploads.splice(i,1);
-  renderPreviews();
+  document.getElementById('prev-grid').innerHTML = uploads.map((f,j)=>
+    `<div class="prev-item"><img src="${URL.createObjectURL(f)}"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${j})">✕</button></div>`
+  ).join('');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1136,39 +1091,39 @@ function rmFile(i) {
 async function submitListing() {
   const marka = document.getElementById('f-marka').value.trim();
   if (!marka) { toast('Unesite marku vozila', 'err'); return; }
-  const btn = document.getElementById('novi-submit-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Objavljujem...'; }
   try {
+    const btn = document.getElementById('novi-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
     let imageUrls = [];
     if (uploads.length > 0) {
-      const compressed = await Promise.all(uploads.map(f => compressImage(f)));
       const fd = new FormData();
-      compressed.forEach(f => fd.append('images', f));
+      uploads.forEach(f => fd.append('images', f));
       const token = localStorage.getItem('token');
       const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
       const upData = await upRes.json();
       if (upData.urls) imageUrls = upData.urls;
     }
     await api('POST', '/listings', {
-      broj:   document.getElementById('f-broj').value.trim() || '',
+      broj:   document.getElementById('f-broj').value.trim(),
       marka,
-      model:  document.getElementById('f-model').value.trim() || '',
-      god:    document.getElementById('f-god').value.trim() || '',
-      stanje: document.getElementById('f-stanje').value || 'Nepoznato',
-      nap:    document.getElementById('f-nap').value.trim() || '',
+      model:  document.getElementById('f-model').value.trim(),
+      god:    document.getElementById('f-god').value.trim(),
+      stanje: document.getElementById('f-stanje').value,
+      nap:    document.getElementById('f-nap').value.trim(),
       images: imageUrls
     });
     uploads = [];
     document.getElementById('prev-grid').innerHTML = '';
-    document.getElementById('file-in').value = '';
     ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
     closeOv('ov-novi');
     toast('✅ Oglas objavljen!', 'ok');
+    invalidateListingsCache();
     sTab('oglasi');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; }
+    const btn = document.getElementById('novi-submit-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Objavi oglas'; }
   }
 }
 
@@ -1199,34 +1154,28 @@ function expireOld() {
 // ═══════════════════════════════════════════════════════
 async function renderMyListings() {
   updateOglasiBadge();
-  const el = document.getElementById('s-oglasi');
-  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const data = await api('GET', '/listings');
+    const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
-      createdAt: new Date(l.created_at).getTime(), ponude: []
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(),
+      ponude: []
     }));
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><h3>Greška: ${e.message}</h3></div>`;
-    return;
-  }
-  const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id) && l.status==='active');
+  } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
+  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status!=='sold');
+  const el = document.getElementById('s-oglasi');
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
   }
   el.innerHTML = mine.map(l => {
-    const pend = parseInt(l.ponuda_count) || 0;
-    const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
+    const pend = l.ponude.filter(p => p.status==='pending').length;
     const badge = pend
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
-    const images = storeImgs('s'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
-    const thumb = images.length
-      ? `<img src="${images[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();galleryById('s${l.id}',0)">`
-      : '🔧';
-    const expW = pend===0 && rem<=3 && rem>0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const thumb = l.thumb ? `<img src="${l.thumb}" loading="lazy">` : '🔧';
+    const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
+    const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
         <div class="s-oglas-thumb">${thumb}</div>
@@ -1235,7 +1184,7 @@ async function renderMyListings() {
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
             📅 Objavljeno: ${fmtDate(l.createdAt)} &nbsp;·&nbsp;
-            ${pend
+            ${l.ponude.length
               ? '✅ Ima ponuda — oglas ne ističe'
               : rem > 0
                 ? (rem <= 3
@@ -1244,7 +1193,7 @@ async function renderMyListings() {
                 : '<span style="color:var(--red)">Istekao</span>'
             }
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">${badge} ${expW}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${badge}</div>
         </div>
       </div>
       <div class="ponude-panel" id="pp-${l.id}"></div>
@@ -1316,6 +1265,7 @@ function acceptPonuda(pid, lid) {
       const l = LISTINGS.find(x=>x.id===lid);
       if (l) { l.status='finished'; l.ponude.forEach(p => { p.status = p.id==pid?'accepted':'rejected'; }); }
       refreshPP(lid);
+      invalidateListingsCache();
       await renderMyListings();
       renderZavrseni();
       sTab('zavrseni');
@@ -1341,112 +1291,46 @@ function refreshPP(lid) {
 }
 
 // ═══════════════════════════════════════════════════════
-// BUYER: ZAVRŠENI
-// ═══════════════════════════════════════════════════════
-async function renderBuyerZavrseni() {
-  const el = document.getElementById('b-zavrseni');
-  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
-  try {
-    const data = await api('GET', '/ponude/my');
-    // Samo ponude koje je OVAJ buyer dobio (status accepted)
-    // i oglas je zaista završen (listing_status = finished/sent/sold)
-    const accepted = data.filter(p =>
-      p.status === 'accepted' &&
-      (p.listing_status === 'finished' || p.listing_status === 'sent' || p.listing_status === 'sold')
-    );
-    if (!accepted.length) {
-      el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Nema završenih kupovina</h3><p>Ovdje će se prikazati oglasi čiju ste ponudu prihvaćenu.</p></div>`;
-      return;
-    }
-    el.innerHTML = accepted.map(p => {
-      const isPoslato = p.listing_status === 'sent';
-      const _imgs = p.listing_image ? [p.listing_image] : [];
-      const _key = 'bz'+p.id;
-      storeImgs(_key, _imgs);
-      const thumb = _imgs.length
-        ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="galleryById('${_key}',0)">`
-        : '🔧';
-      return `<div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px">${thumb}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${p.marka} ${p.model}${p.god?' ('+p.god+')':''}</div>
-            <div style="font-size:12px;color:var(--muted)">👤 ${p.owner_name||'—'} · 📍 ${p.owner_city||'—'}</div>
-          </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${parseFloat(p.cijena)} KM</div>
-        </div>
-        ${isPoslato
-          ? `<div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:12px 14px">
-               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--green);margin-bottom:6px">✅ Katalizator je poslat!</div>
-               <div style="font-size:13px;color:var(--muted2)">Prodavač je označio kao poslato. Očekujte dostavu na vašu adresu.</div>
-               <div style="font-size:12px;color:var(--muted);margin-top:6px">📌 ${p.buyer_addr||'—'} · 🏙️ ${p.buyer_city||'—'}</div>
-             </div>`
-          : `<div style="background:var(--dark);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
-               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--orange2);margin-bottom:6px">📦 Čeka se slanje</div>
-               <div style="font-size:13px;color:var(--muted2)">Prodavač priprema pošiljku na vašu adresu:</div>
-               <div style="font-size:12px;color:var(--muted);margin-top:6px">📌 ${p.buyer_addr||'—'} · 🏙️ ${p.buyer_city||'—'} · 📞 ${p.buyer_tel||'—'}</div>
-             </div>`}
-      </div>`;
-    }).join('');
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><h3>Greška pri učitavanju</h3></div>`;
-  }
-}
+// SELLER: ZAVRŠENI
 // ═══════════════════════════════════════════════════════
 async function renderZavrseni() {
   const el = document.getElementById('s-zavrseni');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const data = await api('GET', '/listings');
+    const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
-  } catch(e) { el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><h3>Greška</h3></div>'; return; }
-
-  const mine = LISTINGS.filter(l => String(l.uid) === String(CU.id) && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
+  } catch(e) { el.innerHTML = '<div class="empty"><p>Greška pri učitavanju.</p></div>'; return; }
+  const mine = LISTINGS.filter(l => l.uid === CU.id && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
   if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Nema završenih oglasa</h3><p>Ovdje će biti oglasi koje ste prodali.</p></div>`;
     return;
   }
-
-  // Fetchuj ponude za svaki završeni oglas da dobijemo adresu kupca
-  await Promise.all(mine.map(async l => {
-    try {
-      const detail = await api('GET', '/listings/' + l.id);
-      l.ponude = (detail.ponude || []).map(p => ({
-        id: p.id, buyerId: p.buyer_id, cijena: parseFloat(p.cijena), status: p.status,
-        buyerName: p.buyer_name, buyerCity: p.buyer_city, buyerTel: p.buyer_tel, buyerAddr: p.buyer_addr
-      }));
-      if (detail.status === 'sent') poslatoSet.add(l.id);
-    } catch(e) { l.ponude = []; }
-  }));
-
-  const sorted = [...mine].sort((a, b) => (poslatoSet.has(a.id)?1:0) - (poslatoSet.has(b.id)?1:0));
-
+  // Fetchaj detalje svakih završenih oglasa da dobijemo buyer adresu
+  const detailed = await Promise.all(mine.map(l => api('GET', '/listings/'+l.id).catch(() => l)));
+  const merged = mine.map(l => {
+    const d = detailed.find(x => x.id === l.id) || l;
+    return { ...l, ponude: d.ponude || [] };
+  });
+  // Sync poslatoSet iz API statusa (status='sent' == označeno kao poslato)
+  merged.forEach(l => { if (l.status === 'sent') poslatoSet.add(l.id); });
+  // Sortiraj: neposlato na vrhu, poslato na dnu
+  const sorted = [...merged].sort((a, b) => {
+    const aP = poslatoSet.has(a.id) ? 1 : 0;
+    const bP = poslatoSet.has(b.id) ? 1 : 0;
+    return aP - bP;
+  });
   el.innerHTML = sorted.map(l => {
-    const acc = l.ponude.find(p => p.status === 'accepted');
-    const _imgs = storeImgs('sz'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
-    const thumb = _imgs.length
-      ? `<img src="${_imgs[0]}" style="cursor:zoom-in" onclick="event.stopPropagation();galleryById('sz${l.id}',0)">`
-      : '🔧';
+    const acc   = l.ponude.find(p => p.status === 'accepted');
+    const buyer = acc ? { name: acc.buyer_name||'Kupac', city: acc.buyer_city||'—', tel: acc.buyer_tel||'—' } : null;
+    const addr  = acc ? getBuyerAddr(acc) : null;
+    const thumb = l.thumb ? `<img src="${l.thumb}" loading="lazy">` : '🔧';
     const isPoslato = poslatoSet.has(l.id);
+    const isOpen = !isPoslato; // neposlato je defaultno otvoreno
 
-    const addrBlock = acc ? `
-      <div class="zav-addr-box" style="margin-bottom:0">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Pošaljite na ovu adresu:</div>
-        <div style="font-size:13px;line-height:2">
-          <b>${acc.buyerName || '—'}</b><br>
-          📌 ${acc.buyerAddr || '—'}<br>
-          🏙️ ${acc.buyerCity || '—'}<br>
-          📞 ${acc.buyerTel || '—'}
-        </div>
-        <div style="font-size:12px;color:var(--muted2);margin-top:8px;border-top:1px solid rgba(29,185,84,.15);padding-top:8px">
-          Dogovorena cijena: <b style="color:var(--green)">${acc.cijena} KM</b>
-        </div>
-      </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema podataka o kupcu.</div>';
-
-    return `<div class="zav-card${isPoslato?' poslato':' open'}" id="zav-${l.id}">
+    return `<div class="zav-card${isPoslato?' poslato':''}${isOpen?' open':''}" id="zav-${l.id}">
       <div class="zav-header" onclick="toggleZav(${l.id})">
         <div class="s-oglas-thumb" style="width:52px;height:52px;font-size:20px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
@@ -1456,7 +1340,19 @@ async function renderZavrseni() {
         ${isPoslato ? '<span class="badge b-ok" style="flex-shrink:0">✅ Poslato</span>' : '<span class="badge b-wait" style="flex-shrink:0">📦 Za slanje</span>'}
         <span class="zav-chevron">▼</span>
       </div>
-      <div class="zav-body">${addrBlock}</div>
+      <div class="zav-body">
+        ${addr ? `
+        <div class="zav-addr-box" style="margin-bottom:0">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Pošaljite na ovu adresu:</div>
+          <div style="font-size:13px;line-height:2">
+            <b>${addr.name}</b><br>
+            📌 ${addr.addr}<br>
+            🏙️ ${addr.city}<br>
+            📞 ${addr.tel}
+          </div>
+          ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2)">Kupac: <b style="color:var(--text)">${buyer.name}</b></div>` : ''}
+        </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
+      </div>
       <div class="zav-check-wrap">
         <input type="checkbox" id="chk-${l.id}" ${isPoslato?'checked':''} onchange="togglePoslato(${l.id},this.checked)">
         <label class="zav-check-label" for="chk-${l.id}">Označeno kao poslato</label>
@@ -1490,9 +1386,9 @@ function renderBuyerPage() {
 async function renderBuyerListings() {
   const el = document.getElementById('b-oglasi');
   try {
-    const data = await api('GET', '/listings');
+    const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
       createdAt: new Date(l.created_at).getTime(),
       ponude: l.my_ponude || []
     }));
@@ -1534,13 +1430,7 @@ async function renderBuyerListings() {
   const moze = canBid();
   el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
-    const images = storeImgs('b'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
-    const thumb = images.length
-      ? `<div class="oglas-img" style="cursor:zoom-in;position:relative" onclick="galleryById('b${l.id}',0)">
-           <img src="${images[0]}">
-           ${images.length > 1 ? `<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px">📷 ${images.length}</div>` : ''}
-         </div>`
-      : `<div class="oglas-img">🔧</div>`;
+    const thumb = l.thumb ? `<div class="oglas-img"><img src="${l.thumb}"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const ponudaBtn = moze
@@ -1558,7 +1448,7 @@ async function renderBuyerListings() {
         </div>
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${l.owner_city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${l.owner_name || 'Prodavač'}</b></div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
           <div class="oglas-actions">
             <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
@@ -1621,6 +1511,7 @@ async function ponudaConfirm() {
     await api('POST', '/ponude', { listing_id: _ponudaLid, cijena: c, dani });
     incrementBidsToday(CU.id);
     closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
+    invalidateListingsCache();
     renderBuyerListings();
     toast('✅ Ponuda '+c+' KM poslana!','ok');
   } catch(err) {
@@ -1644,7 +1535,7 @@ function renderMyPonude() {
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const status=p?p.status:'pending';
     const seller=getOwner(l);
-    const myAddr=BUYER_ADDR[CU.id];
+    const myAddr=CU ? getBuyerAddr(CU) : null;
     const stEl = status==='accepted'
       ? '<span class="badge b-ok" style="font-size:13px;padding:4px 10px">✅ Prihvaćena — prodavač šalje katalizator</span>'
       : status==='declined'
@@ -1754,7 +1645,7 @@ function markAllPorukeRead(role) {
   if (!CU) return;
   if (role === 'seller') {
     // Označi sve poruke na seller-ovim oglasima kao pročitane
-    LISTINGS.filter(l => String(l.uid)===String(CU.id)).forEach(l => {
+    LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
       if ((chatHistory[l.id]||[]).length) markRead(l.id);
     });
   } else {
@@ -1778,7 +1669,7 @@ function hasUnread(lid) {
 function updatePorukeBadges() {
   if (!CU) return;
   if (CU.role === 'seller') {
-    const myIds = LISTINGS.filter(l => String(l.uid)===String(CU.id)).map(l => l.id);
+    const myIds = LISTINGS.filter(l => l.uid === CU.id).map(l => l.id);
     const cnt = myIds.filter(lid => hasUnread(lid)).length;
     const b = document.getElementById('poruke-badge');
     if (b) { b.style.display = cnt ? 'inline' : 'none'; b.textContent = cnt; }
@@ -1795,16 +1686,11 @@ async function sendChatImg(input) {
   if (!file || !chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
-  let receiver_id;
-  if (CU.role === 'buyer') {
-    receiver_id = listing.uid || listing.user_id;
-  } else {
-    const msgs = chatHistory[chatLid] || [];
-    const buyerMsg = msgs.find(m => m.senderId !== CU.id);
-    receiver_id = buyerMsg ? buyerMsg.senderId : null;
-  }
+  const receiver_id = CU.role === 'buyer' ? listing.uid :
+    (listing.ponude && listing.ponude[0] ? listing.ponude[0].buyerId : null);
   if (!receiver_id) { toast('Nije moguće poslati sliku', 'err'); return; }
   try {
+    // Upload slike
     const fd = new FormData();
     fd.append('images', file);
     const token = localStorage.getItem('token');
@@ -1820,30 +1706,9 @@ async function sendChatImg(input) {
   input.value = '';
 }
 
-let _lbImages = [], _lbIdx = 0;
 function openLightbox(src) {
-  _lbImages = [src]; _lbIdx = 0; _showLb();
-}
-function openGallery(images, startIdx) {
-  _lbImages = images; _lbIdx = startIdx || 0; _showLb();
-}
-function _showLb() {
-  const img = document.getElementById('lightbox-img');
-  const counter = document.getElementById('lb-counter');
-  const prev = document.getElementById('lb-prev');
-  const next = document.getElementById('lb-next');
-  img.src = _lbImages[_lbIdx];
-  counter.textContent = _lbImages.length > 1 ? (_lbIdx+1)+' / '+_lbImages.length : '';
-  prev.style.display = _lbImages.length > 1 ? 'flex' : 'none';
-  next.style.display = _lbImages.length > 1 ? 'flex' : 'none';
+  document.getElementById('lightbox-img').src = src;
   document.getElementById('lightbox').classList.add('on');
-}
-function lbNav(dir) {
-  _lbIdx = (_lbIdx + dir + _lbImages.length) % _lbImages.length;
-  _showLb();
-}
-function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('on');
 }
 
 async function sendChat() {
@@ -1852,16 +1717,9 @@ async function sendChat() {
   if (!txt||!chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
-  // Buyer šalje prodavaču; seller šalje buyeru kojeg nađemo u chatHistory
-  let receiver_id;
-  if (CU.role === 'buyer') {
-    receiver_id = listing.uid || listing.user_id;
-  } else {
-    // Seller — nađi buyera iz chatHistory
-    const msgs = chatHistory[chatLid] || [];
-    const buyerMsg = msgs.find(m => m.senderId !== CU.id);
-    receiver_id = buyerMsg ? buyerMsg.senderId : null;
-  }
+  // Odredi receiver_id
+  const receiver_id = CU.role === 'buyer' ? listing.uid : 
+    (listing.ponude && listing.ponude[0] ? listing.ponude[0].buyerId : null);
   if (!receiver_id) { toast('Nije moguće poslati poruku', 'err'); return; }
   try {
     await api('POST', '/chat/'+chatLid, { receiver_id, text: txt });
@@ -1980,8 +1838,7 @@ function saveProfile() {
   CU.tel =document.getElementById('p-tel').value.trim();
   const dEl=document.getElementById('p-default-dani');
   if (dEl) { CU.defaultDana=parseInt(dEl.value)||3; defaultDana=CU.defaultDana; }
-  const idx=USERS.findIndex(u=>u.id===CU.id); if(idx>=0) Object.assign(USERS[idx],CU);
-  if(BUYER_ADDR[CU.id]) Object.assign(BUYER_ADDR[CU.id],{name:CU.name,addr:CU.addr||CU.city,city:CU.city,tel:CU.tel});
+  // CU je ažuriran direktno — getBuyerAddr(CU) će automatski koristiti nove podatke
   document.getElementById('uc-av').textContent=initials(CU.name);
   document.getElementById('uc-name').textContent=CU.name;
   closeOv('ov-profil');
@@ -2005,7 +1862,7 @@ function showConfirm(title,msg,okLabel,cb) {
 // ═══════════════════════════════════════════════════════
 function setAdminFilter(f) {
   adminFilter=f;
-  ['all','seller','buyer','BA','RS'].forEach(x=>{
+  ['all','seller','buyer'].forEach(x=>{
     const b=document.getElementById('af-'+x);
     if(b){ b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost'); }
   });
@@ -2018,9 +1875,7 @@ async function renderAdminUsers() {
     const data = await api('GET', '/admin/users');
     USERS = data;
   } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
-  let list=USERS.filter(u=>u.role!=='admin');
-  if(adminFilter==='seller'||adminFilter==='buyer') list=list.filter(u=>u.role===adminFilter);
-  if(adminFilter==='BA'||adminFilter==='RS') list=list.filter(u=>(u.country||'BA')===adminFilter);
+  let list=USERS.filter(u=>u.role!=='admin'&&(adminFilter==='all'||u.role===adminFilter));
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
   const pend=list.filter(u=>u.status==='pending');
   const rest=list.filter(u=>u.status!=='pending');
@@ -2045,10 +1900,7 @@ function adminCard(u) {
   const col=u.role==='buyer'?'#c0392b':'#e67e22';
   const rB=u.role==='buyer'?'<span class="badge b-orange">Otkupljivač</span>':'<span class="badge b-blue">Prodavač</span>';
   const sB=u.status==='approved'?'<span class="badge b-ok">✅</span>':u.status==='pending'?'<span class="badge b-wait">⏳</span>':'<span class="badge b-err">❌</span>';
-  const premUntil = u.premium_until ? new Date(u.premium_until).getTime() : (u.premiumUntil || null);
-  const premStr = premUntil ? ' do '+fmtDate(premUntil) : '';
-  const premB = u.premium ? `<span class="badge b-orange" style="font-size:10px">⭐ Premium${premStr}</span>` : '';
-  const flag = (u.country||'BA') === 'RS' ? '🇷🇸' : '🇧🇦';
+  const vUntil=u.premiumUntil?(' do '+fmtDate(u.premiumUntil)):''; const vB=u.premium?`<span class="badge b-ok" style="font-size:10px">✅ Premium${vUntil}</span>`:''; const pB=u.premium?'<span class="badge b-orange" style="font-size:10px">⭐ Premium</span>':'';
   // Sve akcije u jedan dropdown
   const ddItems = [];
   if (u.status==='pending') {
@@ -2072,7 +1924,7 @@ function adminCard(u) {
     <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
       <div class="admin-av" style="background:${col}">${initials(u.name)}</div>
       <div style="min-width:0">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${flag} ${u.name} ${rB} ${sB} ${premB}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${vB} ${pB}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
       </div>
     </div>
@@ -2102,13 +1954,9 @@ function openPremiumInfo() { document.getElementById('ov-premium').classList.add
 
 async function admSetPremium(uid, val) {
   try {
-    if (val) {
-      await api('PUT', '/admin/users/'+uid+'/premium', { months: 12 });
-      toast('⭐ Premium dodijeljen', 'ok');
-    } else {
-      await api('DELETE', '/admin/users/'+uid+'/premium');
-      toast('Premium uklonjen', '');
-    }
+    if (val) await api('PUT', '/admin/users/'+uid+'/premium', { months: 12 });
+    else await api('DELETE', '/admin/users/'+uid+'/premium'); // koristi pravi DELETE endpoint
+    toast(val ? '⭐ Premium dodijeljen' : 'Premium uklonjen', val ? 'ok' : '');
     renderAdminUsers();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
@@ -2129,6 +1977,7 @@ async function admReject(uid) {
 }
 
 function toggleUserDetail(uid) {
+  // Pronađi ili kreiraj detail div odmah iza admin kartice
   let el = document.getElementById('ad-'+uid);
   if (!el) {
     const card = document.getElementById('ac-'+uid);
@@ -2139,231 +1988,113 @@ function toggleUserDetail(uid) {
     card.insertAdjacentElement('afterend', el);
   }
   if (el.style.display !== 'none') { el.style.display='none'; return; }
-  const u = USERS.find(x => String(x.id)===String(uid));
-  if (!u) { toast('Osvježi stranicu pa pokušaj ponovo', 'err'); return; }
-  const col = u.role==='buyer' ? '#c0392b' : '#e67e22';
-
-  // Odmah prikaži skeleton
-  el.style.cssText = 'background:var(--dark);border-radius:0 0 8px 8px;margin-top:-8px;border:1px solid var(--border);border-top:none;padding:14px 16px';
-  el.innerHTML = `<div class="card">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
-        <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div>
-        ${u.addr?`<div style="font-size:12px;color:var(--muted2)">📌 ${u.addr}</div>`:''}
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div id="adp-${uid}"><div style="font-size:12px;color:var(--muted)">Učitavam...</div></div>
-    <div class="divider"></div>
-    <div id="adc-${uid}"><div style="font-size:12px;color:var(--muted)">Učitavam konverzacije...</div></div>
-    <div class="divider"></div>
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ad-${uid}').style.display='none'">← Zatvori</button>
-  </div>`;
-  el.style.display = '';
-  el.scrollIntoView({behavior:'smooth', block:'nearest'});
-
-  // Async load svega
-  setTimeout(async () => {
-    try {
-      const allListings = await api('GET', '/listings');
-      const pdEl = document.getElementById('adp-'+uid);
-      const dcEl = document.getElementById('adc-'+uid);
-
-      if (u.role === 'seller') {
-        // Oglasi prodavača
-        const myL = allListings.filter(l => String(l.user_id||l.uid) === String(uid));
-        if (pdEl) pdEl.innerHTML = `
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📋 Oglasi (${myL.length})</div>
-          ${myL.length ? myL.map(l => `
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-              <div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
-                <div style="font-size:11px;color:var(--muted)">${l.ponuda_count||0} ponuda · ${l.status}</div>
-              </div>
-              <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑</button>
-            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema oglasa</div>'}`;
-
-        // Konverzacije sellera
-        const sellerLids = myL.map(l => l.id);
-        const convos = [];
-        await Promise.all(sellerLids.map(async lid => {
-          try {
-            const msgs = await api('GET', '/chat/'+lid);
-            if (!msgs.length) return;
-            const listing = allListings.find(x => x.id === lid);
-            convos.push({ lid, listing, count: msgs.length, last: msgs[msgs.length-1] });
-          } catch(e) {}
-        }));
-        if (dcEl) dcEl.innerHTML = `
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${convos.length})</div>
-          ${convos.length ? convos.map(c => `
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-              <div style="min-width:0;flex:1">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
-                <div style="font-size:11px;color:var(--muted)">${c.count} poruka · "${(c.last.text||'📷').slice(0,30)}"</div>
-              </div>
-              <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
-            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>'}`;
-
-      } else {
-        // Buyer — ponude i konverzacije
-        const buyerPonude = [];
-        const buyerConvos = [];
-        await Promise.all(allListings.map(async l => {
-          try {
-            const detail = await api('GET', '/listings/'+l.id);
-            (detail.ponude||[]).filter(p => String(p.buyer_id)===String(uid)).forEach(p => {
-              buyerPonude.push({ listing: l, p });
-            });
-          } catch(e) {}
-          try {
-            const msgs = await api('GET', '/chat/'+l.id);
-            if (msgs.some(m => String(m.sender_id)===String(uid))) {
-              buyerConvos.push({ lid: l.id, listing: l, count: msgs.length, last: msgs[msgs.length-1] });
-            }
-          } catch(e) {}
-        }));
-
-        if (pdEl) pdEl.innerHTML = `
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📨 Ponude (${buyerPonude.length})</div>
-          ${buyerPonude.length ? buyerPonude.map(({listing, p}) => `
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-              <div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${listing.marka} ${listing.model}</div>
-                <div style="font-size:11px;color:var(--muted)">${p.status}</div>
-              </div>
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${parseFloat(p.cijena)} KM</div>
-            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>'}`;
-
-        if (dcEl) dcEl.innerHTML = `
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${buyerConvos.length})</div>
-          ${buyerConvos.length ? buyerConvos.map(c => `
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-              <div style="min-width:0;flex:1">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${c.listing?c.listing.marka+' '+c.listing.model:'Oglas #'+c.lid}</div>
-                <div style="font-size:11px;color:var(--muted)">${c.count} poruka</div>
-              </div>
-              <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.lid})">👁 Čitaj</button>
-            </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>'}`;
-      }
-    } catch(e) {
-      const pdEl = document.getElementById('adp-'+uid);
-      if (pdEl) pdEl.innerHTML = '<div style="font-size:12px;color:var(--red)">Greška pri učitavanju</div>';
-    }
-  }, 0);
+  const u=getU(uid); if(!u) return;
+  const col=u.role==='buyer'?'#c0392b':'#e67e22';
+  let h=`<div class="card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
+    <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
+    <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div></div>
+  </div><div class="divider">`;
+  if(u.role==='seller'){
+    const myL=LISTINGS.filter(l=>l.uid===uid);
+    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📋 Oglasi (${myL.length})</div>`;
+    h+=myL.length?myL.map(l=>`<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div><div style="font-size:11px;color:var(--muted)">${l.ponude.length} ponuda · ${l.status}</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--orange2)">${l.status==='sold'?(l.ponude.find(p=>p.status==='accepted')||{cijena:0}).cijena:0} KM</span><button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑</button></div></div>`).join(''):
+    '<div style="font-size:12px;color:var(--muted)">Nema oglasa</div>';
+  } else {
+    const myP=LISTINGS.flatMap(l=>l.ponude.filter(p=>p.buyerId===uid).map(p=>({...p,listing:l})));
+    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📨 Ponude (${myP.length})</div>`;
+    h+=myP.length?myP.map(p=>`<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${p.listing.marka} ${p.listing.model}</div><div style="font-size:11px;color:var(--muted)">${p.status}</div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} KM</div></div>`).join(''):
+    '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
+  }
+  // Konverzacije
+  const userLids = u.role === 'seller'
+    ? LISTINGS.filter(l => l.uid === uid).map(l => l.id)
+    : LISTINGS.filter(l => (chatHistory[l.id]||[]).some(m => m.senderId === uid)).map(l => l.id);
+  const userConvos = userLids.filter(lid => (chatHistory[lid]||[]).length > 0);
+  if (userConvos.length) {
+    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${userConvos.length})</div>`;
+    h += userConvos.map(lid => {
+      const l = LISTINGS.find(x => x.id === lid);
+      if (!l) return '';
+      const msgs = chatHistory[lid] || [];
+      const last = msgs[msgs.length - 1];
+      const preview = last ? (last.msg || '📷 slika').slice(0, 40) : '';
+      return `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="min-width:0;flex:1">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${msgs.length} poruka · "${preview}"</div>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="admViewChat(${lid})">👁 Čitaj</button>
+      </div>`;
+    }).join('');
+  }
+  h+='<div class="divider"></div><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'ad-'+uid+'\').style.display=\'none\'">← Zatvori</button></div>';
+  el.style.background='var(--dark)';
+  el.style.borderRadius='0 0 8px 8px';
+  el.style.marginTop='-8px';
+  el.style.border='1px solid var(--border)';
+  el.style.borderTop='none';
+  el.style.padding='14px 16px';
+  el.innerHTML=h;
+  el.style.display='';
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 
 // ═══════════════════════════════════════════════════════
 // ADMIN VIEW CHAT (read-only)
 // ═══════════════════════════════════════════════════════
-async function admViewChat(lid) {
+function admViewChat(lid) {
   chatLid = lid;
-  const l = LISTINGS.find(x => x.id === lid) || { marka:'Oglas', model:'#'+lid, uid:null };
+  const l = LISTINGS.find(x => x.id === lid);
+  if (!l) return;
+  const seller = getOwner(l);
+  const msgs = chatHistory[lid] || [];
+  // Nađi buyera
+  const buyerMsg = msgs.find(m => m.from === 'buyer');
+  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
+
+  // Header
   document.getElementById('ch-av').textContent = '👁';
   document.getElementById('ch-av').style.background = '#8e44ad';
-  document.getElementById('ch-name').textContent = l.marka + ' ' + l.model + ' · Admin pregled';
+  document.getElementById('ch-name').textContent = l.marka + ' ' + l.model + ' · ' + seller.name + ' ↔ ' + buyerName;
+
+  // Read-only mode — sakrij input, pokaži admin badge
   const inp = document.getElementById('chat-inp-area');
   if (inp) inp.style.display = 'none';
   const adminBadge = document.getElementById('chat-admin-badge');
   if (adminBadge) adminBadge.style.display = 'flex';
+
+  // Render poruke — prikaži ko je svako
   const el = document.getElementById('chat-msgs');
-  el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">⏳</div>Učitavam...</div>';
-  document.getElementById('ov-chat').classList.add('on');
-  try {
-    const msgs = await api('GET', '/chat/'+lid);
-    if (!msgs.length) {
-      el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Nema poruka</div>';
-      return;
-    }
+  if (!msgs.length) {
+    el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Nema poruka</div>';
+  } else {
     el.innerHTML = msgs.map((m, i) => {
-      const isMe = String(m.sender_id) === String(l.uid);
-      const name = m.sender_name || (isMe ? 'Prodavač' : 'Otkupljivač');
-      const col  = isMe ? '#e67e22' : '#c0392b';
+      const isBuyer = m.from === 'buyer';
+      const name = m.senderName || (isBuyer ? 'Otkupljivač' : 'Prodavač');
+      const col = isBuyer ? '#c0392b' : '#e67e22';
       const prev = msgs[i-1];
-      const showAv = !prev || prev.sender_id !== m.sender_id;
-      const content = m.image_url
-        ? `<img class="bubble-img" src="${m.image_url}" onclick="openLightbox('${m.image_url}')">`
-        : (m.text||'').split('\n').join('<br>');
-      const time = new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'});
-      return `<div class="bubble-wrap ${isMe?'me':''}">
-        ${showAv?`<div class="bubble-av" style="background:${col}">${initials(name)}</div>`:'<div class="bubble-av-ph"></div>'}
-        <div class="bubble-col">
-          ${showAv?`<div class="bubble-name">${name}</div>`:''}
-          <div class="bubble ${isMe?'bubble-me':''}">${content}<span class="bubble-time">${time}</span></div>
-        </div>
+      const showAv = !prev || prev.from !== m.from;
+      const content = m.imgUrl
+        ? `<img class="bubble-img" src="${m.imgUrl}" onclick="openLightbox('${m.imgUrl}')">`
+        : m.msg.split('\n').join('<br>');
+      return `<div class="bubble-wrap ${isBuyer ? 'me' : ''}">
+        ${!isBuyer ? `<div class="bubble-av" style="background:${col};${showAv?'':'opacity:0;pointer-events:none'}">${initials(name)}</div>` : ''}
+        <div class="bubble ${isBuyer ? 'me' : 'them'}">${content}<span class="bubble-time">${m.time}</span></div>
       </div>`;
     }).join('');
     el.scrollTop = el.scrollHeight;
-  } catch(e) {
-    el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">❌</div>Greška pri učitavanju</div>';
   }
-}
 
-// ═══════════════════════════════════════════════════════
-// ADMIN ANALITIKA
-// ═══════════════════════════════════════════════════════
-async function renderAnalitika() {
-  const el = document.getElementById('a-analitika');
-  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam statistiku...</div>';
-  try {
-    const [users, listings] = await Promise.all([
-      api('GET', '/admin/users'),
-      api('GET', '/listings')
-    ]);
-    const sellers   = users.filter(u => u.role==='seller');
-    const buyers    = users.filter(u => u.role==='buyer');
-    const approved  = buyers.filter(u => u.status==='approved');
-    const pending   = buyers.filter(u => u.status==='pending');
-    const premium   = users.filter(u => u.premium);
-    const ba        = users.filter(u => (u.country||'BA')==='BA');
-    const rs        = users.filter(u => (u.country||'BA')==='RS');
-    const active    = listings.filter(l => l.status==='active');
-    const finished  = listings.filter(l => l.status==='finished'||l.status==='sent'||l.status==='sold');
-    const totalPon  = listings.reduce((s,l) => s + parseInt(l.ponuda_count||0), 0);
-    const stat = (icon, label, val, sub, col) =>
-      `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;flex:1;min-width:140px">
-        <div style="font-size:22px;margin-bottom:4px">${icon}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:32px;color:${col||'var(--text)'};line-height:1">${val}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;margin-top:2px">${label}</div>
-        ${sub?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${sub}</div>`:''}
-      </div>`;
-    el.innerHTML = `
-      <div style="padding:4px 0 12px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px">📊 Pregled platforme</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Ažurirano: ${new Date().toLocaleString('bs')}</div>
-
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Korisnici</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-        ${stat('👥','Ukupno korisnika', users.filter(u=>u.role!=='admin').length, `🇧🇦 ${ba.filter(u=>u.role!=='admin').length} · 🇷🇸 ${rs.filter(u=>u.role!=='admin').length}`, 'var(--orange)')}
-        ${stat('🚗','Prodavači', sellers.length, ``, 'var(--orange2)')}
-        ${stat('🏭','Otkupljivači', buyers.length, `✅ ${approved.length} odobren · ⏳ ${pending.length} čeka`, 'var(--blue)')}
-        ${stat('⭐','Premium', premium.length, `od ${buyers.length} otkupljivača`, '#f1c40f')}
-      </div>
-
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Oglasi</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-        ${stat('📋','Ukupno oglasa', listings.length, '', 'var(--text)')}
-        ${stat('✅','Aktivni', active.length, '', 'var(--green)')}
-        ${stat('📦','Završeni/Prodani', finished.length, '', 'var(--muted2)')}
-        ${stat('📨','Ukupno ponuda', totalPon, `prosjek ${listings.length ? (totalPon/listings.length).toFixed(1) : 0} po oglasu`, 'var(--green)')}
-      </div>
-
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Po državama</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${stat('🇧🇦','BiH korisnici', ba.filter(u=>u.role!=='admin').length, `${sellers.filter(u=>(u.country||'BA')==='BA').length} prodavača · ${buyers.filter(u=>(u.country||'BA')==='BA').length} otkup.`, '')}
-        ${stat('🇷🇸','Srbija korisnici', rs.filter(u=>u.role!=='admin').length, `${sellers.filter(u=>u.country==='RS').length} prodavača · ${buyers.filter(u=>u.country==='RS').length} otkup.`, '')}
-      </div>`;
-  } catch(e) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><h3>Greška pri učitavanju</h3></div>';
-  }
+  document.getElementById('ov-chat').classList.add('on');
 }
 
 function admDeleteListing(lid) {
   showConfirm('Obrisati oglas?','Ova akcija ne može se poništiti.','🗑 Da, obriši', async ()=>{
     try {
       await api('DELETE', '/listings/'+lid);
+      invalidateListingsCache();
       renderAdminOglasi();
       toast('Oglas obrisan.','');
     } catch(err) { toast('❌ ' + err.message, 'err'); }
@@ -2372,42 +2103,23 @@ function admDeleteListing(lid) {
 
 async function renderAdminOglasi() {
   const el=document.getElementById('a-oglasi');
-  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const data = await api('GET', '/listings');
+    const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: parseImgs(l.images)[0] || null,
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
       createdAt: new Date(l.created_at).getTime(), ponude: []
     }));
   } catch(e) { toast('Greška', 'err'); return; }
-  el.innerHTML = LISTINGS.length ? LISTINGS.map(l => {
-    const imgs = storeImgs('a'+l.id, parseImgs(l.images).length ? parseImgs(l.images) : (l.thumb ? [l.thumb] : []));
-    const thumbHtml = imgs.length
-      ? `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0;cursor:zoom-in" onclick="event.stopPropagation();galleryById('a${l.id}',0)"><img src="${imgs[0]}"></div>`
-      : `<div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">🔧</div>`;
-    return `<div class="admin-card" id="ac-l-${l.id}" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0">
-      <div style="display:flex;gap:10px;align-items:center;width:100%" onclick="toggleAdminListing(${l.id})">
-        ${thumbHtml}
-        <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
-          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · 👤 ${l.owner_name||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div>
-        </div>
-        <button class="btn btn-or btn-xs" onclick="event.stopPropagation();admDeleteListing(${l.id})">🗑</button>
+  el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
+    return `<div class="admin-card" id="ac-l-${l.id}">
+      <div style="display:flex;gap:10px;align-items:center;flex:1">
+        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
+        <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
+        <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${l.status==='active'?'ok':'wait'}" style="font-size:10px">${l.status}</span></div></div>
       </div>
-      <div id="al-${l.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        ${l.broj?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">OEM: <b style="color:var(--text)">${l.broj}</b></div>`:''}
-        ${l.stanje?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Stanje: <b style="color:var(--text)">${l.stanje}</b></div>`:''}
-        ${l.nap?`<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Napomena: ${l.nap}</div>`:''}
-        <div style="font-size:12px;color:var(--muted2)">Objavljeno: ${fmtDate(l.createdAt)}</div>
-        ${imgs.length > 0 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${imgs.map((img,i)=>`<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:5px;cursor:zoom-in" onclick="galleryById('a${l.id}',${i})">`).join('')}</div>` : ''}
-      </div>
+      <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑 Briši</button>
     </div>`;
-  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
-}
-
-function toggleAdminListing(lid) {
-  const d = document.getElementById('al-'+lid);
-  if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
+  }).join(''):`<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
 }
 
 
@@ -2415,15 +2127,7 @@ function toggleAdminListing(lid) {
 // NOVI OGLAS (FAB)
 // ═══════════════════════════════════════════════════════
 function openNoviOglas() {
-  // Reset forme
-  ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  const st = document.getElementById('f-stanje'); if (st) st.selectedIndex = 0;
-  // Reset slika
-  uploads = [];
-  document.getElementById('prev-grid').innerHTML = '';
-  document.getElementById('file-in').value = '';
+  // Prikaži novi oglas overlay ili resetuj formu i otvori sheet
   document.getElementById('ov-novi').classList.add('on');
 }
 
@@ -2433,7 +2137,7 @@ function openNoviOglas() {
 function renderPoruke() {
   const el = document.getElementById('s-poruke');
   // Skupi sve konverzacije gdje ima poruka za prodavačeve oglase
-  const myListingIds = LISTINGS.filter(l => String(l.uid)===String(CU.id)).map(l => l.id);
+  const myListingIds = LISTINGS.filter(l => l.uid === CU.id).map(l => l.id);
   const convos = [];
   myListingIds.forEach(lid => {
     const msgs = chatHistory[lid] || [];
@@ -2492,25 +2196,30 @@ function renderPoruke() {
   });
 }
 
-async function openSellerChat(lid) {
+function openSellerChat(lid) {
+  // Otvori chat kao seller (suprotna strana)
   chatLid = lid;
   const l = LISTINGS.find(x => x.id === lid);
-  document.getElementById('ov-chat').classList.add('on');
-  // Učitaj poruke iz API-ja da dobijemo buyerov senderId
-  await loadChatMsgs(lid);
+  // Pronađi ko je pisao (buyer)
   const msgs = chatHistory[lid] || [];
-  const buyerMsg = msgs.find(m => m.senderId !== CU.id);
-  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
-  const buyerId   = buyerMsg ? buyerMsg.senderId : 'x';
+  const buyerMsg = msgs.find(m => m.from === 'buyer');
+  const buyerName = buyerMsg ? (buyerMsg.buyerName || 'Otkupljivač') : 'Otkupljivač';
+  const buyerId   = buyerMsg ? (buyerMsg.buyerId || 'x') : 'x';
   document.getElementById('ch-av').textContent = initials(buyerName);
-  document.getElementById('ch-av').style.background = avCol(String(buyerId));
-  document.getElementById('ch-name').textContent = buyerName + ' · ' + (l ? l.marka + ' ' + l.model : '');
+  document.getElementById('ch-av').style.background = avCol(buyerId);
+  document.getElementById('ch-name').textContent = buyerName + ' · ' + l.marka + ' ' + l.model;
   const ta = document.getElementById('chat-ta');
   ta.value = ''; ta.style.height = 'auto';
   updateSendBtn();
-  markRead(lid);
-  updatePorukeBadges();
+  // Render poruka iz seller perspektive
+  renderSellerChatMsgs(lid, buyerName, buyerId);
+  document.getElementById('ov-chat').classList.add('on');
   setTimeout(() => ta.focus(), 150);
+}
+
+function renderSellerChatMsgs(lid, buyerName, buyerId) {
+  // Koristimo isti renderChatMsgs koji je svjestan CU.id
+  renderChatMsgs();
 }
 
 
@@ -2707,7 +2416,7 @@ function showAC(inputId, countrySelectId) {
 
   // Odredi koja država je odabrana
   const cEl = document.getElementById(countrySelectId);
-  const country = (cEl ? cEl.value : 'BA').toLowerCase();
+  const country = cEl ? cEl.value : 'ba';
   const cities = CITIES[country] || CITIES.ba;
 
   const matches = cities.filter(c => c.toLowerCase().includes(val)).slice(0, 8);
@@ -2800,16 +2509,21 @@ function sTabSilent(n) {
   if (n==='zavrseni') renderZavrseni();
 }
 function bTabSilent(n) {
-  ['oglasi','moje','zavrseni','poruke'].forEach(x => {
+  ['oglasi','moje','poruke'].forEach(x => {
     const t=document.getElementById('bt-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('bp-'+x); if(p) p.classList.toggle('on',x===n);
   });
+  if (n==='oglasi') renderBuyerListings();
+  if (n==='moje')   renderMyPonude();
+  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke(); }
 }
 function aTabSilent(n) {
-  ['users','oglasi','analitika'].forEach(x => {
+  ['users','oglasi'].forEach(x => {
     const t=document.getElementById('at-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('ap-'+x); if(p) p.classList.toggle('on',x===n);
   });
+  if (n==='users')  renderAdminUsers();
+  if (n==='oglasi') renderAdminOglasi();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2845,7 +2559,7 @@ let lastSeenPonude = {}; // lid -> broj ponuda kad je zadnji put gledao
 
 function updateOglasiBadge() {
   if (!CU || CU.role !== 'seller') return;
-  const mine = LISTINGS.filter(l => String(l.uid)===String(CU.id));
+  const mine = LISTINGS.filter(l => l.uid === CU.id);
   let newCount = 0;
   mine.forEach(l => {
     const seen = lastSeenPonude[l.id] || 0;
@@ -2858,7 +2572,7 @@ function updateOglasiBadge() {
 
 function markOglasiSeen() {
   if (!CU) return;
-  LISTINGS.filter(l => String(l.uid)===String(CU.id)).forEach(l => {
+  LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
     lastSeenPonude[l.id] = l.ponude.filter(p => p.status === 'pending').length;
   });
   const b = document.getElementById('oglasi-badge');
