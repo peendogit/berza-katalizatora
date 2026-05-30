@@ -367,7 +367,15 @@ app.delete('/api/listings/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Zabranjen pristup' });
     }
 
-    await pool.query('UPDATE listings SET status = $1 WHERE id = $2', ['deleted', req.params.id]);
+    if (req.user.role === 'admin') {
+      // Admin: hard delete iz baze (ponude se brišu CASCADE ili ručno)
+      await pool.query('DELETE FROM ponude WHERE listing_id = $1', [req.params.id]);
+      await pool.query('DELETE FROM messages WHERE listing_id = $1', [req.params.id]);
+      await pool.query('DELETE FROM listings WHERE id = $1', [req.params.id]);
+    } else {
+      // Seller: soft delete
+      await pool.query('UPDATE listings SET status = $1 WHERE id = $2', ['deleted', req.params.id]);
+    }
         // Invalidate listings cache
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.json({ ok: true });
