@@ -590,13 +590,19 @@ async function renderZavrseni() {
   });
   // Sync poslatoSet iz API statusa (status='sent' == označeno kao poslato)
   merged.forEach(l => { if (l.status === 'sent') poslatoSet.add(l.id); });
-  // Sortiraj: neposlato na vrhu, poslato na dnu
+  // Sortiraj: najnoviji na vrhu, poslato na dno
   const sorted = [...merged].sort((a, b) => {
     const aP = poslatoSet.has(a.id) ? 1 : 0;
     const bP = poslatoSet.has(b.id) ? 1 : 0;
-    return aP - bP;
+    if (aP !== bP) return aP - bP;
+    return b.createdAt - a.createdAt; // noviji na vrhu
   });
-  el.innerHTML = sorted.map(l => {
+  // Paginacija — 20 po stranici
+  const PAGE_SIZE = 20;
+  const zavPage = window._zavPage || 0;
+  const paginated = sorted.slice(0, (zavPage + 1) * PAGE_SIZE);
+  const hasMore = sorted.length > paginated.length;
+  el.innerHTML = paginated.map(l => {
     const acc   = l.ponude.find(p => p.status === 'accepted');
     const buyer = acc ? { name: acc.buyer_name||'Kupac', city: acc.buyer_city||'—', tel: acc.buyer_tel||'—' } : null;
     const addr  = acc ? getBuyerAddr(acc) : null;
@@ -635,7 +641,7 @@ async function renderZavrseni() {
         <label class="zav-check-label" for="chk-${l.id}">Označeno kao poslato</label>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (hasMore ? `<div style="text-align:center;margin:16px 0"><button class="btn btn-ghost" onclick="window._zavPage=(window._zavPage||0)+1;renderZavrseni()">Učitaj još (${sorted.length - paginated.length})</button></div>` : '');
 }
 
 function toggleZav(lid) {
@@ -749,11 +755,28 @@ async function renderBuyerListings() {
 // ═══════════════════════════════════════════════════════
 // PONUDA OVERLAY
 // ═══════════════════════════════════════════════════════
+function openPonudaOvMin(lid, naziv, minCijena) {
+  openPonudaOv(lid, naziv);
+  // Postavi minimum
+  const inp = document.getElementById('pon-iznos');
+  if (inp) {
+    inp.min = minCijena + 1;
+    inp.placeholder = 'Min. ' + (minCijena + 1) + ' KM';
+  }
+  // Dodaj info o minimumu
+  const sub = document.getElementById('pon-sub');
+  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' KM';
+}
+
 function openPonudaOv(lid, naziv) {
   _ponudaLid = lid;
   document.getElementById('pon-title').textContent = naziv;
   document.getElementById('pon-sub').textContent = 'Unesite iznos vaše ponude';
   document.getElementById('pon-iznos').value = '';
+  document.getElementById('pon-iznos').min = '';
+  document.getElementById('pon-iznos').placeholder = 'npr. 150';
+  const subEl = document.getElementById('pon-sub');
+  if (subEl) subEl.textContent = 'Unesite iznos vaše ponude';
   // Postavi default dana iz profila
   const dSel = document.getElementById('pon-dani');
   if (dSel) dSel.value = String(CU && CU.defaultDana ? CU.defaultDana : defaultDana);
@@ -770,6 +793,9 @@ function ponudaPreview() {
 function ponudaNext() {
   const c=parseFloat(document.getElementById('pon-iznos').value);
   if (!c||c<1) { toast('Unesite iznos ponude','err'); return; }
+  const inp = document.getElementById('pon-iznos');
+  const minVal = parseFloat(inp.min||0);
+  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' KM', 'err'); return; }
   const l=LISTINGS.find(x=>x.id===_ponudaLid);
   const dani = parseInt(document.getElementById('pon-dani').value)||3;
   document.getElementById('pon-prev-iznos').textContent=c+' KM';
@@ -878,8 +904,13 @@ function renderMyPonude() {
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
     // Pronađi ponudu iz LISTINGS direktno — uvijek ažuran status
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
-    const rawStatus = p ? p.status : 'pending';
+    const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
+    // Koliko puta je odbijena (iz allMyPonude — brojimo odbijene za ovaj oglas)
+    const myPonudeForListing = getMyPonude().filter(x => x.lid === mp.lid);
+    const rejectedCount = myPonudeForListing.filter(x => x.status === 'rejected').length;
+    const lastCijena = Math.max(...myPonudeForListing.map(x => x.cijena || 0), 0);
+    const canRetry = status === 'declined' && rejectedCount < 2;
     const seller=getOwner(l);
     const myAddr=CU ? getBuyerAddr(CU) : null;
     const stEl = status==='accepted'
@@ -900,7 +931,7 @@ function renderMyPonude() {
       </div>` : status==='declined' ? `
       <div style="background:var(--rL);border:1px solid rgba(230,57,70,.15);border-radius:7px;padding:10px 12px;margin-top:8px;font-size:13px;color:var(--muted2)">
         Prodavač je odbio vašu ponudu od <b>${mp.cijena} KM</b>.
-        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Pošalji novu ponudu</button></div>
+        ${canRetry ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openPonudaOvMin(${l.id},'${l.marka} ${l.model}',${lastCijena})">📤 Pošalji novu ponudu</button></div>` : '<div style="margin-top:6px;font-size:12px;color:var(--red)">Iskoristili ste sve pokušaje za ovaj oglas.</div>'}
       </div>` : '';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
