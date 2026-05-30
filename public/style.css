@@ -34,7 +34,7 @@
 .theme-btn { background:none; border:1.5px solid var(--border2); border-radius:20px; padding:4px 10px; font-size:16px; cursor:pointer; transition:all .2s; color:var(--text); line-height:1; }
 .theme-btn:hover { border-color:var(--orange); transform:scale(1.1); }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;}
+body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";min-height:100vh;}
 
 /* PAGES — kritično: svaka stranica ima explicit display */
 .page { display:none; }

@@ -673,11 +673,12 @@ async function renderBuyerListings() {
     }));
     // Sync my ponude
     allMyPonude[CU.id] = LISTINGS.flatMap(l =>
-      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, expiresAt: new Date(p.expires_at).getTime() }))
+      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime() }))
     );
   } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
-  const sentLids = getMyPonude().map(p => p.lid);
-  const activeRaw = LISTINGS.filter(l => l.status==='active' && !sentLids.includes(l.id));
+  // Sakrij oglas iz aktivnih samo ako ima pending ili accepted ponudu (ne rejected)
+  const blockedLids = getMyPonude().filter(p => p.status === 'pending' || p.status === 'accepted').map(p => p.lid);
+  const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
@@ -1064,6 +1065,7 @@ function startBadgePoll() {
 
 async function sendChatImg(input) {
   const file = input.files[0];
+  input.value = ''; // resetuj odmah da ne pita ponovo
   if (!file || !chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
@@ -1077,20 +1079,26 @@ async function sendChatImg(input) {
   }
   if (!receiver_id) { toast('Nema aktivne konverzacije s kupcem', 'err'); return; }
   try {
-    // Upload slike
     const fd = new FormData();
     fd.append('images', file);
     const token = localStorage.getItem('token');
     const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+    if (!upRes.ok) {
+      const errText = await upRes.text();
+      throw new Error('Upload greška: ' + (errText.includes('{') ? JSON.parse(errText).error : 'Pokušajte ponovo'));
+    }
     const upData = await upRes.json();
     const image_url = upData.urls ? upData.urls[0] : null;
     if (!image_url) throw new Error('Upload slike nije uspio');
     await api('POST', '/chat/'+chatLid, { receiver_id, image_url });
-    await loadChatMsgs(chatLid);
+    if (CU.role === 'seller') {
+      await loadChatMsgsWithBuyer(chatLid, receiver_id);
+    } else {
+      await loadChatMsgs(chatLid);
+    }
     markRead(chatLid);
     updatePorukeBadges();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
-  input.value = '';
 }
 
 let _lbGallery = [];
@@ -1672,7 +1680,15 @@ function admToggleOglas(id) {
 // NOVI OGLAS (FAB)
 // ═══════════════════════════════════════════════════════
 function openNoviOglas() {
-  // Prikaži novi oglas overlay ili resetuj formu i otvori sheet
+  // Resetuj formu i slike
+  uploads = [];
+  const pg = document.getElementById('prev-grid');
+  if (pg) pg.innerHTML = '';
+  ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const fs = document.getElementById('f-stanje');
+  if (fs) fs.selectedIndex = 0;
   document.getElementById('ov-novi').classList.add('on');
 }
 
