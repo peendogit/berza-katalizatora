@@ -432,7 +432,6 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
       <div style="text-align:center;font-size:13px;color:var(--muted2);margin-bottom:22px">Prijavite se</div>
       <div class="fg"><label>Email</label><input id="in-email" type="email" placeholder="vas@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <div class="fg"><label>Lozinka</label><input id="in-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.9">Demo: <b>prodavac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>otkupljivac@test.ba</b> / 1234 &nbsp;·&nbsp; <b>admin@berza.ba</b> / admin</p>
       <button class="btn btn-primary btn-block" onclick="doLogin()">Prijavi se</button>
       <div class="divider"></div>
       <div style="text-align:center;font-size:13px;color:var(--muted2)">Nemate nalog? <button onclick="showRegisterPage()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;font-family:Barlow,sans-serif">Registrujte se →</button></div>
@@ -857,7 +856,7 @@ function showRegisterPage() { showPage('page-register'); setTimeout(() => initAC
 function goHome() {
   if (!CU) { showPage('page-hero'); return; }
   if (CU.role === 'admin')        { showPage('page-admin');  aTab('users'); }
-  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('novi'); }
+  else if (CU.role === 'seller')  { showPage('page-seller'); sTab('oglasi'); }
   else                            { showPage('page-buyer'); }
 }
 
