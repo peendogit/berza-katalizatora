@@ -191,39 +191,48 @@ app.get('/api/listings', auth, async (req, res) => {
     if (req.user.role === 'seller') {
       console.log('SELLER listings request, user.id:', req.user.id, typeof req.user.id);
       query = `
-        SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
+        SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap, 
+               l.images, l.status, l.country, l.created_at,
+               u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
         WHERE l.user_id = $1::integer
-        GROUP BY l.id, u.name, u.city, u.tel
+        GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
+                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [parseInt(req.user.id)];
       const debugResult = await pool.query(query, params);
-      console.log('SELLER listings count:', debugResult.rows.length, 'rows:', JSON.stringify(debugResult.rows.map(r=>({id:r.id,marka:r.marka,status:r.status}))));
-      return res.json(debugResult.rows.map(l => ({ ...l, images: (() => { try { return JSON.parse(l.images||'[]'); } catch(e) { return []; } })() })));
+      console.log('SELLER listings count:', debugResult.rows.length, 'rows:', JSON.stringify(debugResult.rows.map(r=>({id:r.id,marka:r.marka,status:r.status,user_id:r.user_id}))));
+      return res.json(debugResult.rows.map(l => ({ ...l, images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })() })));
     } else if (req.user.role === 'admin') {
       // Admin vidi SVE oglase bez filtera
       query = `
-        SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
+        SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
+               l.images, l.status, l.country, l.created_at,
+               u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
-        GROUP BY l.id, u.name, u.city, u.tel
+        GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
+                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [];
     } else {
       // Buyer vidi samo aktivne iz svoje zemlje
       query = `
-        SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
+        SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
+               l.images, l.status, l.country, l.created_at,
+               u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
         WHERE l.status = 'active' AND l.country = $1
-        GROUP BY l.id, u.name, u.city, u.tel
+        GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
+                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [req.user.country || 'BA'];
     }
