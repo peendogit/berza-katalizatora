@@ -480,6 +480,8 @@ app.post('/api/ponude', auth, async (req, res) => {
       return res.status(400).json({ error: 'Već imate aktivnu ponudu za ovaj oglas' });
     }
 
+    // Invalidate cache da buyer odmah vidi ažurirane podatke
+    Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
