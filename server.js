@@ -765,12 +765,20 @@ app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 // UPLOAD ROUTE
 // ═══════════════════════════════════════════════════════════
-app.post('/api/upload', auth, upload.array('images', 5), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: 'Nije uploadovana nijedna slika' });
-  }
-  const urls = req.files.map(f => `/uploads/${f.filename}`);
-  res.json({ urls });
+app.post('/api/upload', auth, (req, res, next) => {
+  upload.array('images', 10)(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Slika je prevelika (max 5MB po slici)' });
+      }
+      return res.status(400).json({ error: err.message || 'Upload greška' });
+    }
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'Nije uploadovana nijedna slika' });
+    }
+    const urls = req.files.map(f => `/uploads/${f.filename}`);
+    res.json({ urls });
+  });
 });
 
 // ─── SPA fallback ─────────────────────────────────────────
