@@ -8,8 +8,12 @@ let USERS = [];
 // getBuyerAddr(buyerObj) vraća adresu iz API objekta
 function getBuyerAddr(b) {
   if (!b) return null;
-  if (!b.addr && !b.city && !b.tel) return null;
-  return { name: b.name||b.buyer_name||'Kupac', addr: b.addr||b.buyer_addr||'', city: b.city||b.buyer_city||'', tel: b.tel||b.buyer_tel||'' };
+  const name = b.buyer_name || b.name || 'Kupac';
+  const addr = b.buyer_addr || b.addr || '';
+  const city = b.buyer_city || b.city || '';
+  const tel  = b.buyer_tel  || b.tel  || '';
+  if (!addr && !city && !tel) return null;
+  return { name, addr, city, tel };
 }
 
 let LISTINGS = [];
@@ -205,8 +209,8 @@ function loginUser(u) {
   document.getElementById('uc-name').textContent = u.name;
   // Navigate
   const fab = document.getElementById('fab');
-  if (u.role === 'seller') { fab.classList.add('show'); showPage('page-seller'); sTab('oglasi'); setTimeout(()=>{ updatePorukeBadges(); updateOglasiBadge(); }, 100); }
-  else { fab.classList.remove('show'); if (u.role==='admin') { showPage('page-admin'); aTab('users'); } else { showPage('page-buyer'); renderBuyerPage(); setTimeout(updatePorukeBadges, 100); } }
+  if (u.role === 'seller') { fab.classList.add('show'); showPage('page-seller'); sTab('oglasi'); setTimeout(()=>{ updatePorukeBadges(); updateOglasiBadge(); startBadgePoll(); }, 100); }
+  else { fab.classList.remove('show'); if (u.role==='admin') { showPage('page-admin'); aTab('users'); } else { showPage('page-buyer'); renderBuyerPage(); setTimeout(()=>{ updatePorukeBadges(); startBadgePoll(); }, 100); } }
 }
 
 function doLogout() {
@@ -275,7 +279,7 @@ function sTab(n) {
     const p=document.getElementById('sp-'+x); if(p) p.classList.toggle('on',x===n);
   });
   if (n==='oglasi')   { renderMyListings(); markOglasiSeen(); }
-  if (n==='poruke')   { markAllPorukeRead('seller'); renderPoruke(); }
+  if (n==='poruke')   { markAllPorukeRead('seller'); renderPoruke().then(updatePorukeBadges); }
   if (n==='zavrseni') renderZavrseni();
 }
 
@@ -288,7 +292,7 @@ function bTab(n) {
   if (n==='oglasi') renderBuyerListings();
   if (n==='moje')   renderMyPonude();
   if (n==='zavrseni') renderBuyerZavrseni();
-  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke(); }
+  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke().then(updatePorukeBadges); }
 }
 
 function aTab(n) {
@@ -793,7 +797,7 @@ async function renderBuyerZavrseni() {
   const el = document.getElementById('b-zavrseni');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const data = await cachedListings();
+    const data = await api('GET', '/listings'); // forsiraj svjež fetch
     LISTINGS = data.map(l => ({
       ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
       createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || []
@@ -907,6 +911,8 @@ async function openChat(lid, title) {
   // Učitaj poruke iz API
   await loadChatMsgs(lid);
   markRead(chatLid);
+  // Označi kao pročitano na serveru
+  api('PUT', '/chat/'+lid+'/read').catch(()=>{});
   updatePorukeBadges();
   setTimeout(()=>ta.focus(), 150);
 }
@@ -920,14 +926,18 @@ async function loadChatMsgs(lid) {
       url += '?buyer_id=' + l.ponude[0].buyerId;
     }
     const msgs = await api('GET', url);
+    const sellerUid = l ? (l.uid || l.user_id) : null;
     chatHistory[lid] = msgs.map(m => ({
       senderId: m.sender_id,
       senderName: m.sender_name,
-      from: m.sender_id === (l ? l.uid : null) ? 'seller' : 'buyer',
+      from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
+    // Spremi buyer_id za seller odgovor (prva poruka koja nije od sellera)
+    const buyerMsg = chatHistory[lid].find(m => m.from === 'buyer');
+    if (buyerMsg) chatHistory[lid]._buyerId = buyerMsg.senderId;
   } catch(e) {
     chatHistory[lid] = [];
   }
@@ -1000,15 +1010,41 @@ function updatePorukeBadges() {
   }
 }
 
+// Polling za unread badges svakih 30s
+let _badgePollInterval = null;
+function startBadgePoll() {
+  if (_badgePollInterval) return;
+  _badgePollInterval = setInterval(async () => {
+    if (!CU) return;
+    try {
+      const inbox = await api('GET', '/chat/inbox');
+      let changed = false;
+      inbox.forEach(c => {
+        const key = CU.id + ':' + c.listing_id;
+        const had = unreadLids.has(key);
+        if (parseInt(c.unread_count) > 0) { unreadLids.add(key); if (!had) changed = true; }
+        else unreadLids.delete(key);
+      });
+      if (changed || inbox.length) updatePorukeBadges();
+    } catch(e) {}
+  }, 30000);
+}
+
 
 async function sendChatImg(input) {
   const file = input.files[0];
   if (!file || !chatLid) return;
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
-  const receiver_id = CU.role === 'buyer' ? parseInt(listing.uid||listing.user_id) :
-    (listing.ponude && listing.ponude[0] ? parseInt(listing.ponude[0].buyerId||listing.ponude[0].buyer_id) : null);
-  if (!receiver_id) { toast('Nije moguće poslati sliku', 'err'); return; }
+  let receiver_id;
+  if (CU.role === 'buyer') {
+    receiver_id = parseInt(listing.uid||listing.user_id);
+  } else {
+    const hist = chatHistory[chatLid] || [];
+    const bId = hist._buyerId || (hist.find(m => m.from === 'buyer') || {}).senderId;
+    receiver_id = bId ? parseInt(bId) : null;
+  }
+  if (!receiver_id) { toast('Nema aktivne konverzacije s kupcem', 'err'); return; }
   try {
     // Upload slike
     const fd = new FormData();
@@ -1038,9 +1074,16 @@ async function sendChat() {
   const listing = LISTINGS.find(x=>x.id===chatLid);
   if (!listing) return;
   // Odredi receiver_id
-  const receiver_id = CU.role === 'buyer' ? parseInt(listing.uid||listing.user_id) :
-    (listing.ponude && listing.ponude[0] ? parseInt(listing.ponude[0].buyerId||listing.ponude[0].buyer_id) : null);
-  if (!receiver_id) { toast('Nije moguće poslati poruku', 'err'); return; }
+  let receiver_id;
+  if (CU.role === 'buyer') {
+    receiver_id = parseInt(listing.uid||listing.user_id);
+  } else {
+    // Seller — uzmi buyer_id iz chat historije
+    const hist = chatHistory[chatLid] || [];
+    const bId = hist._buyerId || (hist.find(m => m.from === 'buyer') || {}).senderId;
+    receiver_id = bId ? parseInt(bId) : null;
+  }
+  if (!receiver_id) { toast('Nema aktivne konverzacije s kupcem', 'err'); return; }
   try {
     await api('POST', '/chat/'+chatLid, { receiver_id, text: txt });
     ta.value=''; ta.style.height='auto';
@@ -1560,8 +1603,31 @@ function openNoviOglas() {
 // ═══════════════════════════════════════════════════════
 // PORUKE (seller inbox)
 // ═══════════════════════════════════════════════════════
-function renderPoruke() {
+async function renderPoruke() {
   const el = document.getElementById('s-poruke');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
+  try {
+    const inbox = await api('GET', '/chat/inbox');
+    await Promise.all(inbox.map(async c => {
+      try {
+        const msgs = await api('GET', '/chat/'+c.listing_id+'?buyer_id='+c.buyer_id);
+        const l = LISTINGS.find(x => x.id === parseInt(c.listing_id));
+        const sellerUid = l ? (l.uid || l.user_id) : CU.id;
+        if (!chatHistory[c.listing_id]) chatHistory[c.listing_id] = [];
+        chatHistory[c.listing_id] = msgs.map(m => ({
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
+          msg: m.text || '',
+          imgUrl: m.image_url || null,
+          time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
+        }));
+        chatHistory[c.listing_id]._buyerId = c.buyer_id;
+        if (parseInt(c.unread_count) > 0) unreadLids.add(CU.id + ':' + c.listing_id);
+        else unreadLids.delete(CU.id + ':' + c.listing_id);
+      } catch(e) {}
+    }));
+  } catch(e) {}
   // Skupi sve konverzacije gdje ima poruka za prodavačeve oglase
   const myListingIds = LISTINGS.filter(l => l.uid === CU.id).map(l => l.id);
   const convos = [];
@@ -1652,8 +1718,32 @@ function renderSellerChatMsgs(lid, buyerName, buyerId) {
 // ═══════════════════════════════════════════════════════
 // PORUKE (buyer inbox) — konverzacije koje je otkupljivač pokrenuo
 // ═══════════════════════════════════════════════════════
-function renderBuyerPoruke() {
+async function renderBuyerPoruke() {
   const el = document.getElementById('b-poruke');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
+  // Učitaj inbox iz API-ja
+  try {
+    const inbox = await api('GET', '/chat/inbox');
+    // Učitaj poruke za svaki chat i popuni chatHistory
+    await Promise.all(inbox.map(async c => {
+      try {
+        const msgs = await api('GET', '/chat/'+c.listing_id);
+        const sellerUid = c.seller_id;
+        chatHistory[c.listing_id] = msgs.map(m => ({
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
+          msg: m.text || '',
+          imgUrl: m.image_url || null,
+          time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
+        }));
+        // Označi unread
+        if (parseInt(c.unread_count) > 0) unreadLids.add(CU.id + ':' + c.listing_id);
+        else unreadLids.delete(CU.id + ':' + c.listing_id);
+      } catch(e) {}
+    }));
+  } catch(e) {}
+
   // Nađi sve oglase gdje je otkupljivač pisao
   const convos = [];
   LISTINGS.forEach(l => {
@@ -1931,7 +2021,7 @@ function sTabSilent(n) {
     const p=document.getElementById('sp-'+x); if(p) p.classList.toggle('on',x===n);
   });
   if (n==='oglasi')   { renderMyListings(); markOglasiSeen(); }
-  if (n==='poruke')   { markAllPorukeRead('seller'); renderPoruke(); }
+  if (n==='poruke')   { markAllPorukeRead('seller'); renderPoruke().then(updatePorukeBadges); }
   if (n==='zavrseni') renderZavrseni();
 }
 function bTabSilent(n) {
@@ -1942,7 +2032,7 @@ function bTabSilent(n) {
   if (n==='oglasi') renderBuyerListings();
   if (n==='moje')   renderMyPonude();
   if (n==='zavrseni') renderBuyerZavrseni();
-  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke(); }
+  if (n==='poruke') { markAllPorukeRead('buyer'); renderBuyerPoruke().then(updatePorukeBadges); }
 }
 function aTabSilent(n) {
   ['users','oglasi','analitika'].forEach(x => {
