@@ -462,9 +462,11 @@ async function renderMyListings() {
   }
   el.innerHTML = mine.map(l => {
     const pend = l.ponude.filter(p => p.status==='pending').length;
-    const hasPending = pend > 0;
+    // Koristiti ponuda_count iz API ako lokalne ponude nisu učitane
+    const totalPonuda = pend || parseInt(l.pending_count||l._ponuda_count||0);
+    const hasPending = totalPonuda > 0;
     const badge = hasPending
-      ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
+      ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${totalPonuda} ${totalPonuda===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
