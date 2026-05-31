@@ -336,20 +336,19 @@ function aTab(n) {
 // ═══════════════════════════════════════════════════════
 function handleDrop(e) { e.preventDefault(); document.getElementById('uz').classList.remove('drag'); handleFiles(e.dataTransfer.files); }
 // Resize slike na max 1200px i kompresuj na 0.82 quality prije uploada
-async function resizeImage(file, maxPx=1200, quality=0.82) {
+async function resizeImage(file, maxPx=900, quality=0.72) {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
       let {width: w, height: h} = img;
-      if (w <= maxPx && h <= maxPx) { resolve(file); return; }
-      const scale = maxPx / Math.max(w, h);
+      const scale = Math.min(1, maxPx / Math.max(w, h));
       w = Math.round(w * scale); h = Math.round(h * scale);
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => resolve(new File([blob], file.name, {type:'image/jpeg'})), 'image/jpeg', quality);
+      canvas.toBlob(blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {type:'image/jpeg'})), 'image/jpeg', quality);
     };
     img.src = url;
   });
@@ -379,7 +378,7 @@ async function submitListing() {
   const marka = document.getElementById('f-marka').value.trim();
   if (!marka) { toast('Unesite marku vozila', 'err'); return; }
   try {
-    const btn = document.getElementById('novi-submit-btn');
+    const btn = document.getElementById('btn-submit-oglas');
     if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
     let imageUrls = [];
     if (uploads.length > 0) {
@@ -406,6 +405,7 @@ async function submitListing() {
     uploads = [];
     document.getElementById('prev-grid').innerHTML = '';
     ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
+    _reEnableBtn();
     closeOv('ov-novi');
     toast('✅ Oglas objavljen!', 'ok');
     invalidateListingsCache();
@@ -414,7 +414,7 @@ async function submitListing() {
     toast('❌ ' + err.message, 'err');
   } finally {
     const btn = document.getElementById('novi-submit-btn');
-    if (btn) { btn.disabled = false; btn.textContent = 'Objavi oglas'; }
+    const btn2 = document.getElementById('btn-submit-oglas'); if (btn2) { btn2.disabled = false; btn2.textContent = '📤 Objavi oglas'; }
   }
 }
 
@@ -1118,11 +1118,29 @@ async function sendChatImg(input) {
     receiver_id = bId ? parseInt(bId) : null;
   }
   if (!receiver_id) { toast('Nema aktivne konverzacije s kupcem', 'err'); return; }
+  // Prikaži progress bar u chatu
+  const chatEl = document.getElementById('chat-msgs');
+  const progressId = 'up-prog-'+Date.now();
+  if (chatEl) {
+    const prog = document.createElement('div');
+    prog.id = progressId;
+    prog.style.cssText = 'text-align:center;padding:8px;font-size:12px;color:var(--muted)';
+    prog.innerHTML = '<div style="background:var(--border);border-radius:4px;overflow:hidden;height:4px;margin-bottom:4px"><div id="prog-bar-'+progressId+'" style="height:100%;background:var(--orange);width:0%;transition:width .3s"></div></div>Šaljem sliku...';
+    chatEl.appendChild(prog);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+  const updateProg = pct => {
+    const bar = document.getElementById('prog-bar-'+progressId);
+    if (bar) bar.style.width = pct+'%';
+  };
+  updateProg(20);
   try {
     const fd = new FormData();
     fd.append('images', file);
     const token = localStorage.getItem('token');
+    updateProg(40);
     const upRes = await fetch('/api/upload', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+    updateProg(80);
     if (!upRes.ok) {
       const errText = await upRes.text();
       throw new Error('Upload greška: ' + (errText.includes('{') ? JSON.parse(errText).error : 'Pokušajte ponovo'));
@@ -1130,6 +1148,7 @@ async function sendChatImg(input) {
     const upData = await upRes.json();
     const image_url = upData.urls ? upData.urls[0] : null;
     if (!image_url) throw new Error('Upload slike nije uspio');
+    updateProg(90);
     await api('POST', '/chat/'+chatLid, { receiver_id, image_url });
     if (CU.role === 'seller') {
       await loadChatMsgsWithBuyer(chatLid, receiver_id);
@@ -1139,6 +1158,9 @@ async function sendChatImg(input) {
     markRead(chatLid);
     updatePorukeBadges();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
+  // Ukloni progress bar
+  const progEl = document.getElementById(progressId);
+  if (progEl) progEl.remove();
 }
 
 let _lbGallery = [];
@@ -1216,6 +1238,9 @@ async function sendChat() {
     markRead(chatLid);
     updatePorukeBadges();
   } catch(err) { toast('❌ ' + err.message, 'err'); }
+  // Ukloni progress bar
+  const progEl = document.getElementById(progressId);
+  if (progEl) progEl.remove();
 }
 
 function updateSendBtn() {
