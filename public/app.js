@@ -860,7 +860,8 @@ async function renderBuyerZavrseni() {
     return;
   }
 
-  el.innerHTML = myFinished.map(l => {
+  const sortedFinished = [...myFinished].sort((a,b) => b.createdAt - a.createdAt);
+  el.innerHTML = sortedFinished.map(l => {
     const acc = (l.my_ponude||[]).find(p => p.status === 'accepted');
     const seller = getOwner(l);
     const myAddr = CU ? getBuyerAddr(CU) : null;
@@ -901,7 +902,8 @@ function renderMyPonude() {
     el.innerHTML=`<div class="empty"><div class="empty-icon">📤</div><h3>Niste još slali ponude</h3><p>Idite na Aktivni oglasi.</p></div>`;
     return;
   }
-  el.innerHTML=ponudeList.map(mp=>{
+  const sortedPonude = [...ponudeList].sort((a,b) => (b.expiresAt||0) - (a.expiresAt||0));
+  el.innerHTML=sortedPonude.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
