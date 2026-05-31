@@ -1741,6 +1741,13 @@ async function renderAnalitika() {
         ${row('Na čekanju', pendingPon, 'var(--yellow)')}
       `)}
 
+      <div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Spot cijene metala (EUR/oz)</div>
+        <div id="metals-list-admin" style="display:flex;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--muted)">Učitavam...</div>
+        </div>
+      </div>
+
       ${section('Korisnici — pregled', `
         ${row('Odobreni otkupljivači', approved.length+' / '+buyers.length, 'var(--green)')}
         ${row('Premium otkupljivači', premium.length, 'var(--yellow)')}
@@ -1748,6 +1755,8 @@ async function renderAnalitika() {
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
       `)}`;
+    // Učitaj metale u analitiku
+    loadMetals();
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
@@ -2358,6 +2367,72 @@ function toast(msg,type='') {
 
 // INIT
 initAC('reg-city', 'reg-country');
+
+// ═══════════════════════════════════════════════════════
+// METALI — spot cijene
+// ═══════════════════════════════════════════════════════
+const METALS_CACHE_KEY = 'metals_cache';
+const METALS_TTL = 3600000; // 1 sat
+
+async function loadMetals() {
+  const el = document.getElementById('metals-list');
+  if (!el) return;
+
+  // Provjeri lokalni cache
+  try {
+    const cached = JSON.parse(localStorage.getItem(METALS_CACHE_KEY)||'{}');
+    if (cached.ts && Date.now() - cached.ts < METALS_TTL && cached.data) {
+      renderMetals(cached.data);
+      return;
+    }
+  } catch(e) {}
+
+  try {
+    // metals.live — besplatan, bez API ključa
+    const res = await fetch('https://api.metals.live/v1/spot/platinum,palladium,rhodium,gold');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    // Konvertuj USD u EUR (aprox 0.92)
+    const USD_EUR = 0.92;
+    const metals = {};
+    data.forEach(m => { metals[Object.keys(m)[0]] = Object.values(m)[0]; });
+    const result = {
+      platinum:  metals.platinum  ? Math.round(metals.platinum  * USD_EUR) : null,
+      palladium: metals.palladium ? Math.round(metals.palladium * USD_EUR) : null,
+      rhodium:   metals.rhodium   ? Math.round(metals.rhodium   * USD_EUR) : null,
+      gold:      metals.gold      ? Math.round(metals.gold      * USD_EUR) : null,
+    };
+    localStorage.setItem(METALS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: result }));
+    renderMetals(result);
+  } catch(e) {
+    if (el) el.innerHTML = '<div style="font-size:12px;color:var(--muted)">Cijene trenutno nedostupne</div>';
+  }
+}
+
+function renderMetals(m) {
+  ['metals-list', 'metals-list-admin'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const items = [
+    { key: 'platinum',  label: 'Platina',   sym: 'Pt', color: '#b0bec5' },
+    { key: 'palladium', label: 'Paladijum', sym: 'Pd', color: '#90caf9' },
+    { key: 'rhodium',   label: 'Rodijum',   sym: 'Rh', color: '#ce93d8' },
+    { key: 'gold',      label: 'Zlato',     sym: 'Au', color: '#f4c430' },
+  ];
+  el.innerHTML = items.map(it => m[it.key] ? `
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;text-align:center;min-width:100px;flex:1">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:${it.color};letter-spacing:1px">${it.sym}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:var(--text)">${m[it.key].toLocaleString('bs')} EUR</div>
+      <div style="font-size:10px;color:var(--muted)">${it.label} / oz</div>
+    </div>` : '').join('');
+  }); // end forEach
+}
+
+// Učitaj metale pri pokretanju
+loadMetals();
+// Osvježi svakih sat
+setInterval(loadMetals, 3600000);
+
 tryAutoLogin().then(() => {
   if (!CU) { showPage('page-hero'); history.replaceState({page:'page-hero'}, ''); }
 });
