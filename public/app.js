@@ -1264,7 +1264,7 @@ function openProfil() {
       </div>
       ${u.premiumUntil ? `<div style="font-size:12px;color:var(--muted2);padding-top:8px;border-top:1px solid rgba(29,185,84,.15)">
         📅 Premium važi do: <b style="color:var(--green)">${fmtDate(u.premiumUntil)}</b>
-        ${u.premiumUntil - Date.now() < 30*86400000 ? '<span style="color:var(--yellow);margin-left:6px">⚠️ Ističe uskoro — obnovi →</span>' : ''}
+        ${u.premiumUntil - Date.now() < 30*86400000 ? '<span style="color:var(--yellow);margin-left:6px">⚠️ Ističe uskoro — kontaktirajte admina za obnovu</span>' : ''}
       </div>` : ''}
     </div>` : '';
 
@@ -1407,6 +1407,7 @@ function adminCard(u) {
       <div style="min-width:0">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${vB} ${pB}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
+        ${u.premium && u.premiumUntil ? `<div style="font-size:10px;color:var(--yellow);margin-top:2px">⭐ Premium do: ${fmtDate(u.premiumUntil)}${(new Date(u.premiumUntil)-Date.now()<30*86400000)?' ⚠️ ističe uskoro':''}</div>` : ''}
       </div>
     </div>
     <div style="flex-shrink:0">
@@ -1688,6 +1689,16 @@ async function renderAnalitika() {
         <b style="font-size:13px;color:${color}">${val}</b>
       </div>`;
 
+    // BiH/RS breakdown
+    const baUsers   = users.filter(u => u.country === 'BA' && u.role !== 'admin');
+    const rsUsers   = users.filter(u => u.country === 'RS' && u.role !== 'admin');
+    const baSellers = baUsers.filter(u => u.role === 'seller');
+    const rsSellers = rsUsers.filter(u => u.role === 'seller');
+    const baBuyers  = baUsers.filter(u => u.role === 'buyer');
+    const rsBuyers  = rsUsers.filter(u => u.role === 'buyer');
+    const baActive  = activeLi.filter(l => l.country === 'BA');
+    const rsActive  = activeLi.filter(l => l.country === 'RS');
+
     el.innerHTML = `
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         ${statBox('Prodavači', sellers.length, 'var(--orange)')}
@@ -1702,6 +1713,23 @@ async function renderAnalitika() {
         ${statBox('Srbija oglasi', rs)}
       </div>
 
+      ${section('BiH vs Srbija', `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:12px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted2);margin-bottom:8px">Bosna i Hercegovina</div>
+            ${row('Prodavači', baSellers.length)}
+            ${row('Otkupljivači', baBuyers.length)}
+            ${row('Aktivni oglasi', baActive.length, 'var(--green)')}
+          </div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:12px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted2);margin-bottom:8px">Srbija</div>
+            ${row('Prodavači', rsSellers.length)}
+            ${row('Otkupljivači', rsBuyers.length)}
+            ${row('Aktivni oglasi', rsActive.length, 'var(--green)')}
+          </div>
+        </div>
+      `)}
+
       ${section('Korisnici — zadnjih 7 dana', barChart(days, maxDay, 'var(--orange)'))}
 
       ${section('Ponude — zadnjih 7 dana', barChart(ponDays, maxPon, 'var(--green)'))}
@@ -1711,8 +1739,6 @@ async function renderAnalitika() {
         ${row('Prihvaćene', acceptedPon, 'var(--green)')}
         ${row('Odbijene', rejectedPon, 'var(--red)')}
         ${row('Na čekanju', pendingPon, 'var(--yellow)')}
-        ${row('Prosječna cijena', avgCijena ? avgCijena+' KM' : '—')}
-        ${row('Najveća ponuda', maxCijena ? maxCijena+' KM' : '—')}
       `)}
 
       ${section('Korisnici — pregled', `
@@ -1722,7 +1748,6 @@ async function renderAnalitika() {
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
       `)}`;
-
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
@@ -1751,6 +1776,7 @@ async function renderAdminOglasi() {
         <span style="color:var(--muted);font-size:12px;flex-shrink:0">▼</span>
       </div>
       <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2);font-size:12px;line-height:2.1">
+        ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>'\'' + x + '\'').join(',')}])">`).join('')}</div>` : ''; })()}
         ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
         <b>Stanje:</b> ${l.stanje||'—'}<br>
         <b>Objavio:</b> ${l.owner_name||'—'}<br>
