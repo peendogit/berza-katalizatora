@@ -92,13 +92,13 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // ═══════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════
-const getU     = id => USERS.find(u => u.id === id);
+const getU     = id => USERS.find(u => String(u.id) === String(id));
 const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: l.owner_name||'Nepoznat', city: l.owner_city||'—', tel: l.owner_tel||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
 const avCol    = id => { const s = String(id||'x'); return avColors[s.charCodeAt(s.length-1) % avColors.length]; };
 const now8     = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
-const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); };
+const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'. '+(d.getMonth()+1).toString().padStart(2,'0')+'. '+d.getFullYear()+'.'; };
 
 // ═══════════════════════════════════════════════════════
 // PAGE NAVIGATION
