@@ -461,8 +461,9 @@ async function renderMyListings() {
     return;
   }
   el.innerHTML = mine.map(l => {
-    const pend = l.ponude.filter(p => p.status==='pending').length || l._ponuda_count || 0;
-    const badge = pend
+    const pend = l.ponude.filter(p => p.status==='pending').length;
+    const hasPending = pend > 0;
+    const badge = hasPending
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${pend} ${pend===1?'ponuda':'ponude'} ▾</span>`
       : `<span class="badge b-wait">⏳ Čeka ponude</span>`;
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
@@ -470,6 +471,8 @@ async function renderMyListings() {
     const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
     const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
+    const addedDate = l.createdAt ? fmtDate(l.createdAt) : '';
+    const soldDate = l.sold_at ? fmtDate(new Date(l.sold_at).getTime()) : '';
     const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
@@ -478,15 +481,15 @@ async function renderMyListings() {
           <div class="s-oglas-title">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
-            📅 Objavljeno: ${fmtDate(l.createdAt)} &nbsp;·&nbsp;
-            ${l.ponude.length
+            📅 ${fmtDate(l.createdAt)}
+            ${soldDate ? ' &nbsp;·&nbsp; ✅ Prodano: '+soldDate : ''}
+            ${!soldDate ? ' &nbsp;·&nbsp; ' + (l.ponude.length
               ? '✅ Ima ponuda — oglas ne ističe'
               : rem > 0
                 ? (rem <= 3
                     ? '<span style="color:var(--yellow)">⚠️ Ističe za '+rem+' '+(rem===1?'dan':'dana')+'</span>'
                     : 'Ističe za '+rem+' '+(rem===1?'dan':'dana'))
-                : '<span style="color:var(--red)">Istekao</span>'
-            }
+                : '<span style="color:var(--red)">Istekao</span>') : ''}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${badge}</div>
         </div>
@@ -1494,53 +1497,76 @@ async function toggleUserDetail(uid) {
     }
   } catch(e) {}
   const col=u.role==='buyer'?'#c0392b':'#e67e22';
-  let h=`<div class="card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+  // Fetchaj inbox za ovog korisnika direktno iz API-ja
+  let userConvoData = [];
+  try {
+    const inboxRes = await api('GET', '/admin/chat/inbox/'+uid).catch(()=>[]);
+    userConvoData = Array.isArray(inboxRes) ? inboxRes : [];
+  } catch(e) {}
+
+  let h=`<div style="padding:4px 0">`;
+  // ── Info korisnika ──
+  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
     <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
-    <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
-    <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div></div>
-  </div><div class="divider">`;
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
+      <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div>
+      <div style="font-size:11px;color:var(--muted)">Registrovan: ${fmtDate(new Date(u.created_at).getTime())}</div>
+      ${u.premium && u.premiumUntil ? `<div style="font-size:11px;color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</div>` : ''}
+    </div>
+  </div>
+  <div class="divider"></div>`;
+
   if(u.role==='seller'){
-    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📋 Oglasi (${userListings.length})</div>`;
+    const sold = userListings.filter(l => l.status==='finished'||l.status==='sent');
+    h+=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">OGLASI (${userListings.length}) · Prodano: ${sold.length}</div>`;
     h+=userListings.length?userListings.map(l=>{
       const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status;
-      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
-        <div style="font-size:11px;color:var(--muted)">${l.ponuda_count||0} ponuda · ${stLabel} · ${fmtDate(new Date(l.created_at).getTime())}</div></div>
+      const stColor = l.status==='active'?'var(--green)':l.status==='finished'||l.status==='sent'?'var(--orange)':'var(--muted)';
+      const soldDate = l.sold_at ? ' · Prodano: '+fmtDate(new Date(l.sold_at).getTime()) : '';
+      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
+        <div style="min-width:0;flex:1">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-size:11px;color:var(--muted)">Dodano: ${fmtDate(new Date(l.created_at).getTime())}${soldDate}</div>
+          <span style="font-size:10px;color:${stColor}">${stLabel}</span>
+        </div>
         <button class="btn btn-or btn-xs" onclick="admDeleteListing(${l.id})">🗑</button>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema oglasa</div>';
   } else {
-    h+=`</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">📨 Ponude (${userPonude.length})</div>`;
+    const accepted = userPonude.filter(p=>p.status==='accepted');
+    const rejected = userPonude.filter(p=>p.status==='rejected');
+    h+=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">PONUDE (${userPonude.length}) · Prihvaćene: ${accepted.length} · Odbijene: ${rejected.length}</div>`;
     h+=userPonude.length?userPonude.map(p=>{
-      const stLabel = p.status==='accepted'?'✅ Prihvaćena':p.status==='rejected'?'❌ Odbijena':'⏳ Na čekanju';
-      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${p.marka||'—'} ${p.model||''}</div>
-        <div style="font-size:11px;color:var(--muted)">${stLabel}</div></div>
+      const stColor = p.status==='accepted'?'var(--green)':p.status==='rejected'?'var(--red)':'var(--yellow)';
+      const stLabel = p.status==='accepted'?'Prihvaćena':p.status==='rejected'?'Odbijena':'Na čekanju';
+      const respondDate = p.responded_at ? ' · Odgovor: '+fmtDate(new Date(p.responded_at).getTime()) : '';
+      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${p.marka||'—'} ${p.model||''}</div>
+          <div style="font-size:11px;color:var(--muted)">Poslano: ${fmtDate(new Date(p.created_at).getTime())}${respondDate}</div>
+          <span style="font-size:10px;color:${stColor}">${stLabel}</span>
+        </div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} KM</div>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
   }
-  // Konverzacije
-  const userLids = u.role === 'seller'
-    ? LISTINGS.filter(l => l.uid === uid).map(l => l.id)
-    : LISTINGS.filter(l => (chatHistory[l.id]||[]).some(m => m.senderId === uid)).map(l => l.id);
-  const userConvos = userLids.filter(lid => (chatHistory[lid]||[]).length > 0);
-  if (userConvos.length) {
-    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">💬 Konverzacije (${userConvos.length})</div>`;
-    h += userConvos.map(lid => {
-      const l = LISTINGS.find(x => x.id === lid);
-      if (!l) return '';
-      const msgs = chatHistory[lid] || [];
-      const last = msgs[msgs.length - 1];
-      const preview = last ? (last.msg || '📷 slika').slice(0, 40) : '';
-      return `<div style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+
+  // ── Konverzacije iz API-ja ──
+  if (userConvoData.length) {
+    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">KONVERZACIJE (${userConvoData.length})</div>`;
+    h += userConvoData.map(c => {
+      const title = (c.marka||'') + ' ' + (c.model||'');
+      const preview = c.last_text ? c.last_text.slice(0,40) : '—';
+      const lastDate = c.last_at ? fmtDate(new Date(c.last_at).getTime()) : '';
+      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:10px">
         <div style="min-width:0;flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}</div>
-          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${msgs.length} poruka · "${preview}"</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${title.trim()||'Oglas #'+c.listing_id}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastDate} · "${preview}"</div>
         </div>
-        <button class="btn btn-ghost btn-xs" onclick="admViewChat(${lid})">👁 Čitaj</button>
+        <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.listing_id},${u.id})">Čitaj</button>
       </div>`;
     }).join('');
   }
@@ -1560,20 +1586,50 @@ async function toggleUserDetail(uid) {
 // ═══════════════════════════════════════════════════════
 // ADMIN VIEW CHAT (read-only)
 // ═══════════════════════════════════════════════════════
-function admViewChat(lid) {
+async function admViewChat(lid, uid) {
   chatLid = lid;
   const l = LISTINGS.find(x => x.id === lid);
-  if (!l) return;
-  const seller = getOwner(l);
-  const msgs = chatHistory[lid] || [];
-  // Nađi buyera
-  const buyerMsg = msgs.find(m => m.from === 'buyer');
-  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
 
-  // Header
   document.getElementById('ch-av').textContent = '👁';
   document.getElementById('ch-av').style.background = '#8e44ad';
-  document.getElementById('ch-name').textContent = l.marka + ' ' + l.model + ' · ' + seller.name + ' ↔ ' + buyerName;
+  document.getElementById('ch-name').textContent = (l ? l.marka+' '+l.model : 'Oglas #'+lid) + ' · Admin pregled';
+  document.getElementById('ov-chat').classList.add('on');
+
+  // Sakrij input za admin pregled
+  const inputArea = document.querySelector('#ov-chat .chat-input-wrap');
+  if (inputArea) inputArea.style.display = 'none';
+
+  const chatEl = document.getElementById('chat-msgs');
+  if (chatEl) chatEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
+
+  try {
+    const msgs = await api('GET', '/admin/chat/'+lid+'/'+uid);
+    const seller = getOwner(l||{});
+    if (chatEl) chatEl.innerHTML = msgs.length ? msgs.map(m => {
+      const isOwner = l && String(m.sender_id) === String(l.user_id || l.uid);
+      const time = new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'});
+      const dateStr = new Date(m.created_at).toLocaleDateString('bs');
+      const txt = m.image_url
+        ? `<img class="bubble-img" src="${m.image_url}" onclick="openLightbox('${m.image_url}')" style="cursor:zoom-in">`
+        : (m.text||'').split('\n').join('<br>');
+      return `<div class="bubble-wrap ${isOwner?'me':''}">
+        ${!isOwner?`<div class="bubble-av" style="background:#8e44ad">${initials(m.sender_name||'?')}</div>`:''}
+        <div class="bubble ${isOwner?'me':'them'}">
+          <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px">${m.sender_name||'?'} · ${dateStr}</div>
+          ${txt}<span class="bubble-time">${time}</span>
+        </div>
+      </div>`;
+    }).join('') : '<div style="padding:16px;text-align:center;color:var(--muted)">Nema poruka</div>';
+    if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+  } catch(e) {
+    if (chatEl) chatEl.innerHTML = '<div style="padding:16px;color:var(--red)">Greška pri učitavanju</div>';
+  }
+  return; // Admin pregled — ne nastavljaj dalje
+
+  // Stari kod (nedostižan za admin)
+  const msgs2 = chatHistory[lid] || [];
+  const buyerMsg = msgs2.find(m => m.from === 'buyer');
+  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
 
   // Read-only mode — sakrij input, pokaži admin badge
   const inp = document.getElementById('chat-inp-area');
