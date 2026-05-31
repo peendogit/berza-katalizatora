@@ -1563,21 +1563,19 @@ async function toggleUserDetail(uid) {
   }
 
   // ── Konverzacije iz API-ja ──
-  if (userConvoData.length) {
-    h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">KONVERZACIJE (${userConvoData.length})</div>`;
-    h += userConvoData.map(c => {
-      const title = (c.marka||'') + ' ' + (c.model||'');
-      const preview = c.last_text ? c.last_text.slice(0,40) : '—';
-      const lastDate = c.last_at ? fmtDate(new Date(c.last_at).getTime()) : '';
-      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="min-width:0;flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${title.trim()||'Oglas #'+c.listing_id}</div>
-          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastDate} · "${preview}"</div>
-        </div>
-        <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.listing_id},${u.id})">Čitaj</button>
-      </div>`;
-    }).join('');
-  }
+  h += `<div class="divider"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">KONVERZACIJE (${userConvoData.length})</div>`;
+  h += userConvoData.length ? userConvoData.map(c => {
+    const title = (c.marka||'') + ' ' + (c.model||'');
+    const preview = c.last_text ? c.last_text.slice(0,40) : '—';
+    const lastDate = c.last_at ? fmtDate(new Date(c.last_at).getTime()) : '';
+    return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${title.trim()||'Oglas #'+c.listing_id}</div>
+        <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastDate} · "${preview}"</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="admViewChat(${c.listing_id},${u.id})">Čitaj</button>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--muted)">Nema konverzacija</div>';
   h+='<div class="divider"></div><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'ad-'+uid+'\').style.display=\'none\'">← Zatvori</button></div>';
   el.style.background='var(--dark)';
   el.style.borderRadius='0 0 8px 8px';
