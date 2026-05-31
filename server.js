@@ -275,6 +275,23 @@ app.get('/api/listings', auth, async (req, res) => {
         l.my_ponude = ponudeMap[l.id] || [];
       });
 
+      // Dodaj sve oglase gdje buyer ima bilo kakvu ponudu (rejected/accepted) a nisu u result
+      const allPonudaListingIds = [...new Set(myPonude.rows.map(p => p.listing_id))];
+      const missingIds = allPonudaListingIds.filter(id => !result.rows.find(r => r.id === id));
+      if (missingIds.length > 0) {
+        const missingRes = await pool.query(
+          `SELECT l.*, u.name as owner_name, u.city as owner_city, u.tel as owner_tel
+           FROM listings l JOIN users u ON u.id = l.user_id
+           WHERE l.id = ANY($1)`,
+          [missingIds]
+        );
+        missingRes.rows.forEach(l => {
+          l.my_ponude = ponudeMap[l.id] || [];
+          l.images = (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })();
+          result.rows.push(l);
+        });
+      }
+
       // Dodaj završene oglase gdje je buyer pobijedio (prihvaćena ponuda)
       const finishedIds = myPonude.rows
         .filter(p => p.status === 'accepted')
