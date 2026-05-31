@@ -1441,7 +1441,6 @@ function adminCard(u) {
       <div style="min-width:0">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${vB} ${pB}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
-        ${u.premium && u.premiumUntil ? `<div style="font-size:10px;color:var(--yellow);margin-top:2px">⭐ Premium do: ${fmtDate(u.premiumUntil)}${(new Date(u.premiumUntil)-Date.now()<30*86400000)?' ⚠️ ističe uskoro':''}</div>` : ''}
       </div>
     </div>
     <div style="flex-shrink:0">
