@@ -213,13 +213,28 @@ function loginUser(u) {
   document.getElementById('uc-name').textContent = u.name;
   // Navigate
   const fab = document.getElementById('fab');
-  if (u.role === 'seller') { fab.classList.add('show'); showPage('page-seller'); sTab('oglasi'); setTimeout(()=>{ updatePorukeBadges(); updateOglasiBadge(); startBadgePoll(); }, 100); }
-  else { fab.classList.remove('show'); if (u.role==='admin') { showPage('page-admin'); aTab('users'); } else { showPage('page-buyer'); renderBuyerPage(); setTimeout(()=>{ updatePorukeBadges(); startBadgePoll(); }, 100); } }
+  const savedTab = (() => { try { return JSON.parse(localStorage.getItem('activeTab')); } catch(e) { return null; } })();
+  if (u.role === 'seller') {
+    fab.classList.add('show'); showPage('page-seller');
+    const t = savedTab && savedTab.page === 'page-seller' ? savedTab.stab : 'oglasi';
+    sTab(t);
+    setTimeout(()=>{ updatePorukeBadges(); updateOglasiBadge(); startBadgePoll(); }, 100);
+  } else if (u.role === 'admin') {
+    fab.classList.remove('show'); showPage('page-admin');
+    const t = savedTab && savedTab.page === 'page-admin' ? savedTab.atab : 'users';
+    aTab(t);
+  } else {
+    fab.classList.remove('show'); showPage('page-buyer'); renderBuyerPage();
+    setTimeout(()=>{ updatePorukeBadges(); startBadgePoll(); }, 100);
+    // bTab se poziva unutar renderBuyerPage → bTab('oglasi'), override ako ima saved
+    if (savedTab && savedTab.page === 'page-buyer') setTimeout(()=>bTab(savedTab.btab), 200);
+  }
 }
 
 function doLogout() {
   CU = null; uploads = [];
   localStorage.removeItem('token');
+  localStorage.removeItem('activeTab');
   document.getElementById('hdr-guest').style.display = '';
   document.getElementById('hdr-user').style.display  = 'none';
   document.getElementById('fab').classList.remove('show');
@@ -277,6 +292,7 @@ function fmtCard(el) { let v=el.value.replace(/\D/g,'').slice(0,16); el.value=v.
 // TABS
 // ═══════════════════════════════════════════════════════
 function sTab(n) {
+  localStorage.setItem('activeTab', JSON.stringify({page:'page-seller', stab:n}));
   pushNav({page:'page-seller', stab:n});
   ['oglasi','poruke','zavrseni'].forEach(x => {
     const t=document.getElementById('st-'+x); if(t) t.classList.toggle('on',x===n);
@@ -288,6 +304,7 @@ function sTab(n) {
 }
 
 function bTab(n) {
+  localStorage.setItem('activeTab', JSON.stringify({page:'page-buyer', btab:n}));
   pushNav({page:'page-buyer', btab:n});
   ['oglasi','moje','zavrseni','poruke'].forEach(x => {
     const t=document.getElementById('bt-'+x); if(t) t.classList.toggle('on',x===n);
@@ -300,6 +317,7 @@ function bTab(n) {
 }
 
 function aTab(n) {
+  localStorage.setItem('activeTab', JSON.stringify({page:'page-admin', atab:n}));
   pushNav({page:'page-admin', atab:n});
   ['users','oglasi','analitika'].forEach(x => {
     const t=document.getElementById('at-'+x); if(t) t.classList.toggle('on',x===n);
