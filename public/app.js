@@ -1434,9 +1434,8 @@ function adminCard(u) {
 
   }
   ddItems.push(`<div class="admin-dd-sep"></div>`);
-  ddItems.push(`<div class="admin-dd-item" onclick="toggleUserDetail('${u.id}');closeAdminDD()">👁 Detalji</div>`);
   const acts = ''; const verifyBtn = '';
-  return `<div class="admin-card" id="ac-${u.id}">
+  return `<div class="admin-card" id="ac-${u.id}" onclick="toggleUserDetail('${u.id}')" style="cursor:pointer">
     <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
       <div class="admin-av" style="background:${col}">${initials(u.name)}</div>
       <div style="min-width:0">
@@ -1446,7 +1445,7 @@ function adminCard(u) {
       </div>
     </div>
     <div style="flex-shrink:0">
-      <div class="admin-dd" id="add-${u.id}">
+      <div class="admin-dd" id="add-${u.id}" onclick="event.stopPropagation()">
         <button class="admin-dd-btn" onclick="toggleAdminDD('${u.id}')">Akcije ▾</button>
         <div class="admin-dd-menu">${ddItems.join('')}</div>
       </div>
