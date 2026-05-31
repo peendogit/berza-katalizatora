@@ -882,6 +882,19 @@ app.get('*', (req, res) => {
   } catch(e) { console.error('Migration error:', e.message); }
 })();
 
+// DELETE /api/chat/:listing_id  — obriši razgovor za ovog korisnika
+app.delete('/api/chat/:listing_id', auth, async (req, res) => {
+  try {
+    await pool.query(
+      `DELETE FROM messages WHERE listing_id = $1 AND (sender_id = $2 OR receiver_id = $2)`,
+      [req.params.listing_id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // ─── PUT /api/chat/:listing_id/read  — označi poruke kao pročitane
 app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
   try {
