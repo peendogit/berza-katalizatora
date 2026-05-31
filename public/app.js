@@ -1480,10 +1480,19 @@ async function toggleUserDetail(uid) {
     card.insertAdjacentElement('afterend', el);
   }
   if (el.style.display !== 'none') { el.style.display='none'; return; }
-  const u=getU(uid); if(!u) return;
   el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px">Učitavam...</div>';
   el.style.display = '';
-  // Fetchaj sve oglase za ovog korisnika iz API-ja
+  // Fetchaj korisnika ako nije u USERS
+  let u = getU(uid);
+  if (!u) {
+    try {
+      const allUsers = await api('GET', '/admin/users');
+      USERS = allUsers.map(x => ({ ...x, premiumUntil: x.premium_until ? new Date(x.premium_until).getTime() : null }));
+      u = getU(uid);
+    } catch(e) {}
+  }
+  if (!u) { el.innerHTML = '<div style="color:var(--red);padding:8px">Korisnik nije pronađen</div>'; return; }
+  // Fetchaj oglase i ponude
   let userListings = [];
   let userPonude = [];
   try {
@@ -1491,7 +1500,6 @@ async function toggleUserDetail(uid) {
     if (u.role === 'seller') {
       userListings = allListings.filter(l => String(l.user_id) === String(uid));
     } else {
-      // Za buyera fetchaj ponude direktno
       const ponudeRes = await api('GET', '/admin/ponude').catch(()=>[]);
       userPonude = ponudeRes.filter(p => String(p.buyer_id) === String(uid));
     }
