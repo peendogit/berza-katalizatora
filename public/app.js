@@ -2126,17 +2126,21 @@ function hideCtxMenu() {
   _ctxLid = null;
 }
 
-function deleteConvo() {
+async function deleteConvo() {
   if (_ctxLid === null) return;
-  delete chatHistory[_ctxLid];
-  // Resetuj readAt za ovaj lid
-  Object.keys(readAt).forEach(k => { if (k.endsWith(':'+_ctxLid)) delete readAt[k]; });
   hideCtxMenu();
-  updatePorukeBadges();
-  // Refresh aktivan tab
-  if (CU.role === 'seller') renderPoruke();
-  else renderBuyerPoruke();
-  toast('Razgovor izbrisan', '');
+  try {
+    await api('DELETE', '/chat/'+_ctxLid);
+    delete chatHistory[_ctxLid];
+    Object.keys(readAt).forEach(k => { if (k.endsWith(':'+_ctxLid)) delete readAt[k]; });
+    unreadLids.delete(CU.id+':'+_ctxLid);
+    updatePorukeBadges();
+    if (CU.role === 'seller') renderPoruke();
+    else renderBuyerPoruke();
+    toast('Razgovor izbrisan', '');
+  } catch(err) {
+    toast('❌ ' + err.message, 'err');
+  }
 }
 
 // Zatvori na klik izvan
