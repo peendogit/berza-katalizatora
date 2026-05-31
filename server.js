@@ -229,12 +229,17 @@ app.get('/api/listings', auth, async (req, res) => {
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
                l.images, l.status, l.country, l.created_at,
                u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
-               COUNT(p.id) as ponuda_count
+               COUNT(p.id) as ponuda_count,
+               buyer.name as accepted_buyer_name, buyer.city as accepted_buyer_city,
+               l.sold_at
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
+        LEFT JOIN ponude ap ON ap.listing_id = l.id AND ap.status = 'accepted'
+        LEFT JOIN users buyer ON buyer.id = ap.buyer_id
         GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
-                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
+                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel,
+                 buyer.name, buyer.city
         ORDER BY l.created_at DESC`;
       params = [];
     } else {
@@ -562,8 +567,12 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
     );
     // Oglas označiti kao završen
     await pool.query(
-      `UPDATE listings SET status = 'finished', accepted_ponuda_id = $1 WHERE id = $2`,
+      `UPDATE listings SET status = 'finished', accepted_ponuda_id = $1, sold_at = NOW() WHERE id = $2`,
       [req.params.id, ponuda.rows[0].listing_id]
+    );
+    await pool.query(
+      `UPDATE ponude SET responded_at = NOW() WHERE id = $1`,
+      [req.params.id]
     );
         // Invalidate listings cache
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
@@ -586,7 +595,7 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
     if (ponuda.rows[0].seller_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Zabranjen pristup' });
     }
-    await pool.query(`UPDATE ponude SET status = 'rejected' WHERE id = $1`, [req.params.id]);
+    await pool.query(`UPDATE ponude SET status = 'rejected', responded_at = NOW() WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
@@ -596,6 +605,43 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 // CHAT ROUTES
 // ═══════════════════════════════════════════════════════════
+
+// GET /api/admin/chat/inbox/:uid  — konverzacije za bilo kojeg korisnika (admin)
+app.get('/api/admin/chat/inbox/:uid', auth, adminOnly, async (req, res) => {
+  try {
+    const uid = parseInt(req.params.uid);
+    const result = await pool.query(`
+      SELECT m.listing_id,
+             MAX(m.created_at) as last_at,
+             (SELECT text FROM messages m2 WHERE m2.listing_id=m.listing_id AND (m2.sender_id=$1 OR m2.receiver_id=$1) ORDER BY m2.created_at DESC LIMIT 1) as last_text,
+             l.marka, l.model,
+             COUNT(m.id) as msg_count
+      FROM messages m
+      JOIN listings l ON l.id = m.listing_id
+      WHERE m.sender_id = $1 OR m.receiver_id = $1
+      GROUP BY m.listing_id, l.marka, l.model
+      ORDER BY last_at DESC`, [uid]);
+    res.json(result.rows);
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// GET /api/admin/chat/:listing_id/:uid  — čitaj chat između sellera i buyera
+app.get('/api/admin/chat/:listing_id/:uid', auth, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT m.*, u.name as sender_name
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.listing_id = $1 AND (m.sender_id = $2 OR m.receiver_id = $2)
+      ORDER BY m.created_at ASC`, [req.params.listing_id, req.params.uid]);
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
 
 // GET /api/chat/inbox  — sve konverzacije za trenutnog korisnika
 app.get('/api/chat/inbox', auth, async (req, res) => {
