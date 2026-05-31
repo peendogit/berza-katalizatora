@@ -1786,9 +1786,8 @@ async function renderAdminOglasi() {
         ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>'\'' + x + '\'').join(',')}])">`).join('')}</div>` : ''; })()}
         ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
         <b>Stanje:</b> ${l.stanje||'—'}<br>
-        <b>Objavio:</b> ${l.owner_name||'—'}<br>
-        <b>Grad:</b> ${l.owner_city||'—'}<br>
-        <b>Telefon:</b> ${l.owner_tel||'—'}<br>
+        <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
+        ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${l.accepted_buyer_name} (${l.accepted_buyer_city||'—'})<br>` : ''}
         ${l.nap?`<b>Napomena:</b> ${l.nap}<br>`:''}
         <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}<br>
         <div style="margin-top:10px">
