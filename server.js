@@ -414,6 +414,7 @@ app.put('/api/listings/:id/status', auth, async (req, res) => {
     }
 
     await pool.query('UPDATE listings SET status = $1 WHERE id = $2', [status, req.params.id]);
+    Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
@@ -736,8 +737,8 @@ app.put('/api/admin/users/:id/reject', auth, adminOnly, async (req, res) => {
 // PUT /api/admin/users/:id/premium
 app.put('/api/admin/users/:id/premium', auth, adminOnly, async (req, res) => {
   try {
-    const { months } = req.body;
-    const until = new Date(Date.now() + (months || 1) * 30 * 86400000);
+    const { months, days } = req.body;
+    const until = new Date(Date.now() + (days || (months||12) * 30) * 86400000);
     await pool.query(`UPDATE users SET premium = true, premium_until = $1 WHERE id = $2`, [until, req.params.id]);
     res.json({ ok: true });
   } catch (err) {
@@ -770,7 +771,11 @@ app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/admin/ponude', auth, adminOnly, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, l.marka, l.model FROM ponude p JOIN listings l ON l.id = p.listing_id ORDER BY p.created_at DESC`
+      `SELECT p.*, l.marka, l.model, l.god, u.name as buyer_name
+       FROM ponude p 
+       JOIN listings l ON l.id = p.listing_id
+       JOIN users u ON u.id = p.buyer_id
+       ORDER BY p.created_at DESC`
     );
     res.json(result.rows);
   } catch (err) {
