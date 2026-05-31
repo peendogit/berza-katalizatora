@@ -2128,12 +2128,13 @@ function hideCtxMenu() {
 
 async function deleteConvo() {
   if (_ctxLid === null) return;
+  const lid = _ctxLid; // sačuvaj prije hideCtxMenu koji resetuje _ctxLid
   hideCtxMenu();
   try {
-    await api('DELETE', '/chat/'+_ctxLid);
-    delete chatHistory[_ctxLid];
-    Object.keys(readAt).forEach(k => { if (k.endsWith(':'+_ctxLid)) delete readAt[k]; });
-    unreadLids.delete(CU.id+':'+_ctxLid);
+    await api('DELETE', '/chat/'+lid);
+    delete chatHistory[lid];
+    Object.keys(readAt).forEach(k => { if (k.endsWith(':'+lid)) delete readAt[k]; });
+    unreadLids.delete(CU.id+':'+lid);
     updatePorukeBadges();
     if (CU.role === 'seller') renderPoruke();
     else renderBuyerPoruke();
