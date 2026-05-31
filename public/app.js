@@ -2468,6 +2468,11 @@ function toast(msg,type='') {
 
 // INIT
 initAC('reg-city', 'reg-country');
+// ── Service Worker registracija ──────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
 tryAutoLogin().then(() => {
   if (!CU) { showPage('page-hero'); history.replaceState({page:'page-hero'}, ''); }
 });
