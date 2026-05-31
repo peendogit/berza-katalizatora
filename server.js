@@ -212,7 +212,8 @@ app.get('/api/listings', auth, async (req, res) => {
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap, 
                l.images, l.status, l.country, l.created_at,
                u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
-               COUNT(p.id) as ponuda_count
+               COUNT(p.id) as ponuda_count,
+               COUNT(CASE WHEN p.status = 'pending' THEN 1 END) as pending_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
