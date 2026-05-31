@@ -1883,6 +1883,13 @@ function openNoviOglas() {
 async function renderPoruke() {
   const el = document.getElementById('s-poruke');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
+  // Osiguraj da su LISTINGS učitani
+  if (!LISTINGS.length) {
+    try {
+      const data = await cachedListings();
+      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: [] }));
+    } catch(e) {}
+  }
   try {
     const inbox = await api('GET', '/chat/inbox');
     await Promise.all(inbox.map(async c => {
@@ -2031,6 +2038,13 @@ function renderSellerChatMsgs(lid, buyerName, buyerId) {
 async function renderBuyerPoruke() {
   const el = document.getElementById('b-poruke');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
+  // Osiguraj da su LISTINGS učitani
+  if (!LISTINGS.length) {
+    try {
+      const data = await cachedListings();
+      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || [] }));
+    } catch(e) {}
+  }
   // Učitaj inbox iz API-ja
   try {
     const inbox = await api('GET', '/chat/inbox');
