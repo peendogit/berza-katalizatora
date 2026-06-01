@@ -49,7 +49,6 @@ let chatHistory = {};
 let chatLid = null;
 let _confirmCb = null;
 let _ponudaLid = null;
-let adminFilter = 'all';
 const FREE_DAILY_LIMIT = 10; // max ponuda dnevno za free korisnike
 // dailyBids[userId] = {date:'2024-01-15', count:3}
 const dailyBids = {};
@@ -676,8 +675,8 @@ async function renderZavrseni() {
             📞 ${addr.tel}
           </div>
           ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <span>Kupac: <b style="color:var(--text)">${buyer.name}</b></span>
-            ${acc ? `<button class="btn btn-ghost btn-sm" onclick="openRatingModal(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}')">⭐ Ocijeni kupca</button>` : ''}
+            <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
+            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">⭐ Ocijeni kupca</button>` : ''}
           </div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
       </div>
@@ -729,7 +728,7 @@ async function renderBuyerListings() {
     }));
     // Sync my ponude
     allMyPonude[CU.id] = LISTINGS.flatMap(l =>
-      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime() }))
+      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime(), createdAt: p.created_at ? new Date(p.created_at).getTime() : 0 }))
     );
   } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
   // Sakrij oglas čim je buyer ikad poslao ponudu (bez obzira na status)
@@ -772,8 +771,6 @@ async function renderBuyerListings() {
     const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
-    const salesInfo = '';
-    const ratingInfo = '';
     const ponudaBtn = moze
       ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Ponuda</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
@@ -785,13 +782,11 @@ async function renderBuyerListings() {
           ${l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
           <span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>
           ${expW}
-          ${salesInfo}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
-        ${ratingInfo ? `<div style="margin-bottom:4px">${ratingInfo}</div>` : ''}
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b></div>
           <div class="oglas-actions">
             <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
@@ -935,8 +930,8 @@ async function renderBuyerZavrseni() {
         </div>
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Prodavač: <b style="color:var(--text)">${seller.name}</b> · 📞 ${seller.tel}</span>
-        <button class="btn btn-ghost btn-sm" onclick="openRatingModal(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}')">⭐ Ocijeni prodavača</button>
+        <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
+        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">⭐ Ocijeni prodavača</button>
       </div>
     </div>`;
   }).join('');
@@ -952,7 +947,7 @@ function renderMyPonude() {
     el.innerHTML=`<div class="empty"><div class="empty-icon">📤</div><h3>Niste još slali ponude</h3><p>Idite na Aktivni oglasi.</p></div>`;
     return;
   }
-  const sortedPonude = [...ponudeList].sort((a,b) => (b.expiresAt||0) - (a.expiresAt||0));
+  const sortedPonude = [...ponudeList].sort((a,b) => (b.createdAt||b.expiresAt||0) - (a.createdAt||a.expiresAt||0));
   el.innerHTML=sortedPonude.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
@@ -970,7 +965,7 @@ function renderMyPonude() {
       ${thumb}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
-        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM</div>
+        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
     </div>`;
@@ -1612,8 +1607,6 @@ async function toggleUserDetail(uid) {
   h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
     <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
     <div>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
-      <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div>
       <div style="font-size:11px;color:var(--muted)">Registrovan: ${fmtDate(new Date(u.created_at).getTime())}</div>
       ${u.premium && u.premiumUntil ? `<div style="font-size:11px;color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</div>` : ''}
     </div>
@@ -1726,42 +1719,8 @@ async function admViewChat(lid, uid) {
     if (chatEl) chatEl.innerHTML = '<div style="padding:16px;color:var(--red)">Greška pri učitavanju</div>';
   }
   return; // Admin pregled — ne nastavljaj dalje
-
-  // Stari kod (nedostižan za admin)
-  const msgs2 = chatHistory[lid] || [];
-  const buyerMsg = msgs2.find(m => m.from === 'buyer');
-  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
-
-  // Read-only mode — sakrij input, pokaži admin badge
-  const inp = document.getElementById('chat-inp-area');
-  if (inp) inp.style.display = 'none';
-  const adminBadge = document.getElementById('chat-admin-badge');
-  if (adminBadge) adminBadge.style.display = 'flex';
-
-  // Render poruke — prikaži ko je svako
-  const el = document.getElementById('chat-msgs');
-  if (!msgs.length) {
-    el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Nema poruka</div>';
-  } else {
-    el.innerHTML = msgs.map((m, i) => {
-      const isBuyer = m.from === 'buyer';
-      const name = m.senderName || (isBuyer ? 'Otkupljivač' : 'Prodavač');
-      const col = isBuyer ? '#c0392b' : '#e67e22';
-      const prev = msgs[i-1];
-      const showAv = !prev || prev.from !== m.from;
-      const content = m.imgUrl
-        ? `<img class="bubble-img" src="${m.imgUrl}" onclick="openLightbox('${m.imgUrl}')">`
-        : m.msg.split('\n').join('<br>');
-      return `<div class="bubble-wrap ${isBuyer ? 'me' : ''}">
-        ${!isBuyer ? `<div class="bubble-av" style="background:${col};${showAv?'':'opacity:0;pointer-events:none'}">${initials(name)}</div>` : ''}
-        <div class="bubble ${isBuyer ? 'me' : 'them'}">${content}<span class="bubble-time">${m.time}</span></div>
-      </div>`;
-    }).join('');
-    el.scrollTop = el.scrollHeight;
-  }
-
-  document.getElementById('ov-chat').classList.add('on');
 }
+
 
 function admDeleteListing(lid) {
   showConfirm('Obrisati oglas?','Ova akcija ne može se poništiti.','🗑 Da, obriši', async ()=>{
@@ -2653,6 +2612,69 @@ async function _submitRating(toUserId, listingId) {
   } catch(err) {
     toast('❌ ' + err.message, 'err');
     if (btn) { btn.disabled = false; btn.textContent = 'Ocijeni'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// PROVJERA OCJENE + KORISNIČKI PROFIL
+// ═══════════════════════════════════════════════════════
+async function checkAndRate(toUserId, listingId, listingName, btn) {
+  try {
+    const res = await api('GET', '/ratings/check/' + listingId);
+    if (res.rated) {
+      if (btn) { btn.disabled = true; btn.textContent = `⭐ Ocijenjeno (${res.rating.stars}★)`; btn.style.opacity = '.5'; }
+      toast('Već ste ocijenili ovu transakciju.', '');
+      return;
+    }
+    openRatingModal(toUserId, listingId, listingName);
+  } catch(e) {
+    openRatingModal(toUserId, listingId, listingName);
+  }
+}
+
+async function openUserProfile(userId, userName) {
+  const existing = document.getElementById('ov-user-profile');
+  if (existing) existing.remove();
+  const ov = document.createElement('div');
+  ov.id = 'ov-user-profile';
+  ov.className = 'ov ov-center on';
+  ov.style.cssText = 'z-index:10001';
+  ov.innerHTML = `
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:100%;max-width:360px;animation:slideUp .22s ease" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#fff">👤 ${userName}</div>
+        <button onclick="document.getElementById('ov-user-profile').remove()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div id="user-profile-body" style="color:#aaa;font-size:13px;text-align:center;padding:16px">Učitavam...</div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+
+  try {
+    const data = await api('GET', '/ratings/' + userId);
+    const col = avCol(String(userId));
+    const body = document.getElementById('user-profile-body');
+    if (!body) return;
+    const avgStars = data.avg_stars || 0;
+    const total = data.total || 0;
+    const sales = data.sales_count || 0;
+    let starsStr = '';
+    for(let i=1;i<=5;i++) {
+      starsStr += `<span style="font-size:30px;color:${i<=Math.round(avgStars)?'#f4c430':'#444'}">${i<=Math.round(avgStars)?'★':'☆'}</span>`;
+    }
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div style="width:56px;height:56px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;color:#fff">${initials(userName)}</div>
+        <div style="font-size:15px;font-weight:700;color:#fff">${userName}</div>
+        ${avgStars > 0 ? `
+          <div>${starsStr}</div>
+          <div style="font-size:13px;color:#aaa">${avgStars} prosjek · ${total} ${total===1?'ocjena':'ocjena'}</div>
+        ` : `<div style="font-size:13px;color:#555;margin:8px 0">Još nema ocjena</div>`}
+        ${sales > 0 ? `<div style="background:rgba(29,185,84,.12);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#1db954;margin-top:4px">✅ ${sales} uspješnih prodaja</div>` : ''}
+      </div>`;
+  } catch(e) {
+    const body = document.getElementById('user-profile-body');
+    if (body) body.textContent = 'Nije moguće učitati profil.';
   }
 }
 
