@@ -34,11 +34,10 @@
 .theme-btn { background:none; border:1.5px solid var(--border2); border-radius:20px; padding:4px 10px; font-size:16px; cursor:pointer; transition:all .2s; color:var(--text); line-height:1; }
 .theme-btn:hover { border-color:var(--orange); transform:scale(1.1); }
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{height:100%;overflow:hidden;}body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";min-height:100vh;}
+body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";min-height:100vh;overscroll-behavior:none;}
 
 /* PAGES — kritično: svaka stranica ima explicit display */
 .page { display:none; }
-.page.on { display:block; height:100vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none; }
 
 /* HEADER */
 header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:52px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
