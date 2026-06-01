@@ -469,15 +469,18 @@ async function renderMyListings() {
       _ponuda_count: parseInt(l.ponuda_count)||0
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
-  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
+  expireOld();
+  const mine    = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
+  const expired = LISTINGS.filter(l => l.uid===CU.id && l.status==='expired');
   const el = document.getElementById('s-oglasi');
-  if (!mine.length) {
+
+  if (!mine.length && !expired.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
   }
-  el.innerHTML = mine.map(l => {
+
+  const activeHtml = mine.length ? mine.map(l => {
     const pend = l.ponude.filter(p => p.status==='pending').length;
-    // Koristiti ponuda_count iz API ako lokalne ponude nisu učitane
     const totalPonuda = pend || parseInt(l.pending_count||l._ponuda_count||0);
     const hasPending = totalPonuda > 0;
     const badge = hasPending
@@ -488,9 +491,7 @@ async function renderMyListings() {
     const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
     const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
-    const addedDate = l.createdAt ? fmtDate(l.createdAt) : '';
     const soldDate = l.sold_at ? fmtDate(new Date(l.sold_at).getTime()) : '';
-    const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
         <div class="s-oglas-thumb">${thumb}</div>
@@ -513,7 +514,42 @@ async function renderMyListings() {
       </div>
       <div class="ponude-panel" id="pp-${l.id}"></div>
     </div>`;
-  }).join('');
+  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
+
+  const expiredHtml = expired.length ? `
+    <div style="margin-top:20px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⏰ Istekli oglasi (${expired.length})</div>
+      ${expired.map(l => {
+        const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
+        const thumbSrc = imgs[0] || null;
+        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '🔧';
+        return `<div class="s-oglas-card" style="opacity:.65">
+          <div class="s-oglas-body">
+            <div class="s-oglas-thumb">${thumb}</div>
+            <div style="flex:1">
+              <div class="s-oglas-title" style="color:var(--muted)">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+              <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
+              <div class="s-oglas-meta">📅 ${fmtDate(l.createdAt)} &nbsp;·&nbsp; <span style="color:var(--red)">Isteklo bez ponuda</span></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();reactivateListing(${l.id})">🔄 Reaktiviraj</button>
+                <button class="btn btn-or btn-xs" onclick="event.stopPropagation();deleteListing(${l.id})">🗑 Obriši</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  el.innerHTML = activeHtml + expiredHtml;
+}
+
+async function reactivateListing(lid) {
+  try {
+    await api('PUT', '/listings/'+lid+'/status', { status: 'active' });
+    invalidateListingsCache();
+    toast('✅ Oglas reaktiviran — važi još 7 dana', 'ok');
+    renderMyListings();
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
 
 async function togglePP(lid) {
