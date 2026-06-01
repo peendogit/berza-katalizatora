@@ -504,7 +504,10 @@ app.put('/api/listings/:id/status', auth, async (req, res) => {
       return res.status(403).json({ error: 'Zabranjen pristup' });
     }
 
-    await pool.query('UPDATE listings SET status = $1 WHERE id = $2', [status, req.params.id]);
+    const updateQuery = status === 'active'
+      ? 'UPDATE listings SET status = $1, created_at = NOW() WHERE id = $2'
+      : 'UPDATE listings SET status = $1 WHERE id = $2';
+    await pool.query(updateQuery, [status, req.params.id]);
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.json({ ok: true });
   } catch (err) {
@@ -1226,6 +1229,41 @@ app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
     res.json({ ok: true });
   } catch(err) { res.status(500).json({ error: 'Greška' }); }
 });
+
+// ─── Cron: automatsko istjecanje oglasa ──────────────────
+// Pokreće se svaki sat, istječe oglase starije od 7 dana bez ponuda
+async function expireOldListings() {
+  try {
+    const result = await pool.query(`
+      UPDATE listings
+      SET status = 'expired'
+      WHERE status = 'active'
+        AND created_at < NOW() - INTERVAL '7 days'
+        AND id NOT IN (
+          SELECT DISTINCT listing_id FROM ponude
+          WHERE status IN ('pending', 'accepted')
+        )
+      RETURNING id, user_id, marka, model
+    `);
+    if (result.rows.length > 0) {
+      console.log(`⏰ Isteklo ${result.rows.length} oglasa:`, result.rows.map(r => `#${r.id} ${r.marka} ${r.model}`).join(', '));
+      // Email notifikacija prodavačima
+      for (const l of result.rows) {
+        notifyUser(l.user_id,
+          '⏰ Vaš oglas je istekao — Berza Katalizatora',
+          `<p>Vaš oglas za <b>${l.marka} ${l.model}</b> nije dobio ponude u roku od 7 dana i automatski je istekao.</p>
+           <p>Možete ga ponovo aktivirati prijavom na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
+        ).catch(() => {});
+      }
+    }
+  } catch(e) {
+    console.error('Cron expire error:', e.message);
+  }
+}
+
+// Pokreni odmah pri startu, pa svakih sat vremena
+expireOldListings();
+setInterval(expireOldListings, 60 * 60 * 1000);
 
 // ─── Start ────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
