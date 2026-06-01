@@ -1035,10 +1035,18 @@ app.get('/api/ratings/:user_id', auth, async (req, res) => {
       SELECT COUNT(*) as count FROM listings
       WHERE user_id = $1 AND status IN ('finished','sent')
     `, [req.params.user_id]);
+    const buyerTx = await pool.query(`
+      SELECT COUNT(*) as count FROM ponude
+      WHERE buyer_id = $1 AND status = 'accepted'
+    `, [req.params.user_id]);
+    const userRes = await pool.query(`SELECT role FROM users WHERE id = $1`, [req.params.user_id]);
+    const role = userRes.rows[0] ? userRes.rows[0].role : null;
     res.json({
       avg_stars: parseFloat(result.rows[0].avg_stars) || 0,
       total: parseInt(result.rows[0].total) || 0,
-      sales_count: parseInt(sales.rows[0].count) || 0
+      sales_count: parseInt(sales.rows[0].count) || 0,
+      buyer_transactions: parseInt(buyerTx.rows[0].count) || 0,
+      role
     });
   } catch(err) {
     res.status(500).json({ error: 'Greška' });
