@@ -31,7 +31,13 @@ function buildPoolConfig() {
     ssl:      false
   };
 }
-const pool = new Pool(buildPoolConfig());
+const pool = new Pool({
+  ...buildPoolConfig(),
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 15000
+});
 
 // ─── Middleware ───────────────────────────────────────────
 app.use(compression());
@@ -1222,8 +1228,10 @@ app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`✅ Berza Katalizatora backend — port ${PORT}`);
 });
+server.keepAliveTimeout = 65000;
+server.headersTimeout   = 66000;
 
 module.exports = app;
