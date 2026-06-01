@@ -631,6 +631,15 @@ async function renderZavrseni() {
   });
   // Sync poslatoSet iz API statusa (status='sent' == označeno kao poslato)
   merged.forEach(l => { if (l.status === 'sent') poslatoSet.add(l.id); });
+  // Fetchaj koje transakcije su već ocijenjene
+  let ratedSet = new Set();
+  try {
+    const ratingChecks = await Promise.all(
+      merged.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
+    );
+    merged.forEach((l, i) => { if (ratingChecks[i].rated) ratedSet.add(l.id); });
+  } catch(e) {}
+
   // Sortiraj: najnoviji na vrhu, poslato na dno
   const sorted = [...merged].sort((a, b) => {
     const aP = poslatoSet.has(a.id) ? 1 : 0;
@@ -676,7 +685,7 @@ async function renderZavrseni() {
           </div>
           ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
-            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">⭐ Ocijeni kupca</button>` : ''}
+            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?'disabled style="opacity:.5"':''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id)?'⭐ Ocijenjeno':'⭐ Ocijeni kupca'}</button>` : ''}
           </div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
       </div>
@@ -905,6 +914,16 @@ async function renderBuyerZavrseni() {
   }
 
   const sortedFinished = [...myFinished].sort((a,b) => b.createdAt - a.createdAt);
+
+  // Provjeri koje su već ocijenjene
+  let buyerRatedSet = new Set();
+  try {
+    const checks = await Promise.all(
+      sortedFinished.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
+    );
+    sortedFinished.forEach((l, i) => { if (checks[i].rated) buyerRatedSet.add(l.id); });
+  } catch(e) {}
+
   el.innerHTML = sortedFinished.map(l => {
     const acc = (l.my_ponude||[]).find(p => p.status === 'accepted');
     const seller = getOwner(l);
@@ -931,7 +950,7 @@ async function renderBuyerZavrseni() {
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
-        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">⭐ Ocijeni prodavača</button>
+        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?'disabled style="opacity:.5"':''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">${buyerRatedSet.has(l.id)?'⭐ Ocijenjeno':'⭐ Ocijeni prodavača'}</button>
       </div>
     </div>`;
   }).join('');
@@ -2658,10 +2677,19 @@ async function openUserProfile(userId, userName) {
     const avgStars = data.avg_stars || 0;
     const total = data.total || 0;
     const sales = data.sales_count || 0;
+
+    // Za otkupljivača fetchaj broj prihvaćenih ponuda (transakcija)
+    let buyerTransactions = data.buyer_transactions || 0;
+
     let starsStr = '';
     for(let i=1;i<=5;i++) {
       starsStr += `<span style="font-size:30px;color:${i<=Math.round(avgStars)?'#f4c430':'#444'}">${i<=Math.round(avgStars)?'★':'☆'}</span>`;
     }
+    const isBuyer = data.role === 'buyer';
+    const txCount = isBuyer ? buyerTransactions : sales;
+    const txLabel = isBuyer
+      ? (txCount > 0 ? `<div style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#5dade2;margin-top:4px">🛒 ${txCount} kupovina</div>` : '')
+      : (txCount > 0 ? `<div style="background:rgba(29,185,84,.12);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#1db954;margin-top:4px">✅ ${txCount} uspješnih prodaja</div>` : '');
     body.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
         <div style="width:56px;height:56px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;color:#fff">${initials(userName)}</div>
@@ -2670,7 +2698,7 @@ async function openUserProfile(userId, userName) {
           <div>${starsStr}</div>
           <div style="font-size:13px;color:#aaa">${avgStars} prosjek · ${total} ${total===1?'ocjena':'ocjena'}</div>
         ` : `<div style="font-size:13px;color:#555;margin:8px 0">Još nema ocjena</div>`}
-        ${sales > 0 ? `<div style="background:rgba(29,185,84,.12);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#1db954;margin-top:4px">✅ ${sales} uspješnih prodaja</div>` : ''}
+        ${txLabel}
       </div>`;
   } catch(e) {
     const body = document.getElementById('user-profile-body');
