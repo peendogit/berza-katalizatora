@@ -9,6 +9,8 @@ const path = require('path');
 const fs = require('fs');
 const { Pool } = require('pg');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -39,6 +41,63 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ─── Rate Limiting ────────────────────────────────────────
+const globalLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Previše zahtjeva. Pokušajte ponovo za 15 minuta.' }
+});
+const authLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Previše pokušaja prijave. Pokušajte ponovo za 15 minuta.' }
+});
+const uploadLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Previše upload zahtjeva.' }
+});
+app.use('/api/', globalLimit);
+app.use('/api/auth/login', authLimit);
+app.use('/api/auth/register', authLimit);
+app.use('/api/upload', uploadLimit);
+
+// ─── Email (nodemailer) ───────────────────────────────────
+const mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || ''
+  }
+});
+
+async function sendEmail(to, subject, html) {
+  if (!process.env.SMTP_USER) return; // ne šalje ako nije konfigurisan
+  try {
+    await mailer.sendMail({
+      from: `"Berza Katalizatora" <${process.env.SMTP_USER}>`,
+      to, subject, html
+    });
+  } catch(e) {
+    console.error('Email error:', e.message);
+  }
+}
+
+async function notifyUser(userId, subject, html) {
+  try {
+    const res = await pool.query(
+      'SELECT email, email_notify FROM users WHERE id = $1', [userId]
+    );
+    if (res.rows[0] && res.rows[0].email_notify !== false) {
+      await sendEmail(res.rows[0].email, subject, html);
+    }
+  } catch(e) { console.error('notifyUser error:', e.message); }
+}
 
 // Static files (frontend + uploads)
 app.use(express.static(path.join(__dirname, 'public')));
@@ -249,7 +308,10 @@ app.get('/api/listings', auth, async (req, res) => {
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
                l.images, l.status, l.country, l.created_at,
                u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
-               COUNT(p.id) as ponuda_count
+               COUNT(p.id) as ponuda_count,
+               (SELECT COUNT(*) FROM listings ls WHERE ls.user_id = l.user_id AND ls.status IN ('finished','sent')) as sales_count,
+               ROUND((SELECT AVG(stars)::numeric FROM ratings r WHERE r.to_user_id = l.user_id), 1) as avg_rating,
+               (SELECT COUNT(*) FROM ratings r WHERE r.to_user_id = l.user_id) as rating_count
         FROM listings l
         JOIN users u ON u.id = l.user_id
         LEFT JOIN ponude p ON p.listing_id = l.id
@@ -595,6 +657,13 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
         // Invalidate listings cache
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
 
+    // Email notifikacija kupcu
+    notifyUser(ponuda.rows[0].buyer_id,
+      '✅ Vaša ponuda je prihvaćena — Berza Katalizatora',
+      `<p>Dobra vijest! Vaša ponuda od <b>${ponuda.rows[0].cijena} KM</b> za oglas je prihvaćena.</p>
+       <p>Prodavač će vas kontaktirati ili pogledajte detalje na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
+    ).catch(()=>{});
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
@@ -614,6 +683,14 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
       return res.status(403).json({ error: 'Zabranjen pristup' });
     }
     await pool.query(`UPDATE ponude SET status = 'rejected', responded_at = NOW() WHERE id = $1`, [req.params.id]);
+
+    // Email notifikacija kupcu
+    notifyUser(ponuda.rows[0].buyer_id,
+      'Vaša ponuda nije prihvaćena — Berza Katalizatora',
+      `<p>Žao nam je, vaša ponuda od <b>${ponuda.rows[0].cijena} KM</b> nije prihvaćena.</p>
+       <p>Možete pogledati nove oglase na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
+    ).catch(()=>{});
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
@@ -755,6 +832,15 @@ app.post('/api/chat/:listing_id', auth, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [req.params.listing_id, req.user.id, receiver_id, text || null, image_url || null]
     );
+
+    // Email notifikacija primaocu
+    notifyUser(receiver_id,
+      '💬 Nova poruka — Berza Katalizatora',
+      `<p>Imate novu poruku na Berza Katalizatora.</p>
+       <p>${text ? `"${text.slice(0,200)}"` : '(Slika)'}</p>
+       <p><a href="https://berzakatalizatora.com">Otvorite aplikaciju →</a></p>`
+    ).catch(()=>{});
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
@@ -886,6 +972,172 @@ app.post('/api/upload', auth, (req, res, next) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════
+// RATINGS ROUTES
+// ═══════════════════════════════════════════════════════════
+
+// POST /api/ratings  — ostavi rejting
+app.post('/api/ratings', auth, async (req, res) => {
+  try {
+    const { to_user_id, listing_id, stars } = req.body;
+    if (!to_user_id || !listing_id || !stars || stars < 1 || stars > 5) {
+      return res.status(400).json({ error: 'Nevažeći podaci (zvjezdice 1-5)' });
+    }
+
+    // Provjeri da transakcija postoji i da korisnik ima pravo ocjenjivanja
+    const check = await pool.query(`
+      SELECT p.id, p.buyer_id, l.user_id as seller_id
+      FROM ponude p
+      JOIN listings l ON l.id = p.listing_id
+      WHERE p.listing_id = $1 AND p.status = 'accepted'
+    `, [listing_id]);
+
+    if (!check.rows[0]) {
+      return res.status(403).json({ error: 'Možete ocjeniti samo završene transakcije' });
+    }
+
+    const { buyer_id, seller_id } = check.rows[0];
+    const uid = req.user.id;
+
+    // Buyer ocjenjuje sellera, seller ocjenjuje buyera
+    if (String(uid) !== String(buyer_id) && String(uid) !== String(seller_id)) {
+      return res.status(403).json({ error: 'Nemate pravo ocjeniti ovu transakciju' });
+    }
+    if (String(uid) === String(to_user_id)) {
+      return res.status(400).json({ error: 'Ne možete ocjeniti sami sebe' });
+    }
+
+    // Spremi ili ažuriraj rejting
+    const result = await pool.query(`
+      INSERT INTO ratings (from_user_id, to_user_id, listing_id, stars)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (from_user_id, listing_id) DO UPDATE SET stars = $4, updated_at = NOW()
+      RETURNING *
+    `, [uid, to_user_id, listing_id, Math.round(stars)]);
+
+    res.status(201).json(result.rows[0]);
+  } catch(err) {
+    console.error('Rating error:', err);
+    res.status(500).json({ error: 'Greška pri ocjenjivanju' });
+  }
+});
+
+// GET /api/ratings/:user_id  — dohvati prosjecan rejting korisnika
+app.get('/api/ratings/:user_id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        ROUND(AVG(stars)::numeric, 1) as avg_stars,
+        COUNT(*) as total
+      FROM ratings WHERE to_user_id = $1
+    `, [req.params.user_id]);
+    const sales = await pool.query(`
+      SELECT COUNT(*) as count FROM listings
+      WHERE user_id = $1 AND status IN ('finished','sent')
+    `, [req.params.user_id]);
+    res.json({
+      avg_stars: parseFloat(result.rows[0].avg_stars) || 0,
+      total: parseInt(result.rows[0].total) || 0,
+      sales_count: parseInt(sales.rows[0].count) || 0
+    });
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// GET /api/ratings/check/:listing_id  — da li CU već ima rejting za ovaj oglas
+app.get('/api/ratings/check/:listing_id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM ratings WHERE from_user_id = $1 AND listing_id = $2',
+      [req.user.id, req.params.listing_id]
+    );
+    res.json({ rated: result.rows.length > 0, rating: result.rows[0] || null });
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// BROADCAST ROUTES
+// ═══════════════════════════════════════════════════════════
+
+// POST /api/admin/broadcast  — admin šalje broadcast
+app.post('/api/admin/broadcast', auth, adminOnly, async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Poruka je obavezna' });
+    }
+    const result = await pool.query(
+      'INSERT INTO broadcasts (admin_id, message) VALUES ($1, $2) RETURNING *',
+      [req.user.id, message.trim()]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// GET /api/broadcasts/unread  — nepročitani broadcastovi za CU
+app.get('/api/broadcasts/unread', auth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT b.* FROM broadcasts b
+      LEFT JOIN broadcast_reads br ON br.broadcast_id = b.id AND br.user_id = $1
+      WHERE br.id IS NULL
+      ORDER BY b.created_at DESC
+      LIMIT 10
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// POST /api/broadcasts/:id/read  — označi broadcast kao pročitan
+app.post('/api/broadcasts/:id/read', auth, async (req, res) => {
+  try {
+    await pool.query(
+      'INSERT INTO broadcast_reads (broadcast_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// GET /api/admin/broadcasts  — lista svih broadcastova za admin
+app.get('/api/admin/broadcasts', auth, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT b.*, u.name as admin_name FROM broadcasts b JOIN users u ON u.id = b.admin_id ORDER BY b.created_at DESC LIMIT 50'
+    );
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// EMAIL NOTIFY TOGGLE
+// ═══════════════════════════════════════════════════════════
+
+// PUT /api/auth/email-notify
+app.put('/api/auth/email-notify', auth, async (req, res) => {
+  try {
+    const { email_notify } = req.body;
+    await pool.query(
+      'UPDATE users SET email_notify = $1 WHERE id = $2',
+      [email_notify !== false, req.user.id]
+    );
+    res.json({ ok: true, email_notify: email_notify !== false });
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // ─── SPA fallback ─────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -896,6 +1148,43 @@ app.get('*', (req, res) => {
   try {
     await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ`);
     await pool.query(`ALTER TABLE ponude ADD COLUMN IF NOT EXISTS attempt_count INTEGER DEFAULT 1`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_notify BOOLEAN DEFAULT true`);
+
+    // Ratings tabela
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ratings (
+        id SERIAL PRIMARY KEY,
+        from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        to_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+        stars SMALLINT NOT NULL CHECK (stars BETWEEN 1 AND 5),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(from_user_id, listing_id)
+      )
+    `);
+
+    // Broadcasts tabela
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS broadcasts (
+        id SERIAL PRIMARY KEY,
+        admin_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Broadcast reads (ko je pročitao koji broadcast)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS broadcast_reads (
+        id SERIAL PRIMARY KEY,
+        broadcast_id INTEGER NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        read_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(broadcast_id, user_id)
+      )
+    `);
+
     console.log('✅ DB migration OK');
   } catch(e) { console.error('Migration error:', e.message); }
 })();
