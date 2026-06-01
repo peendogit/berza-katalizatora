@@ -2499,6 +2499,39 @@ function toast(msg,type='') {
 
 // INIT
 initAC('reg-city', 'reg-country');
+
+// ── PWA Install ──────────────────────────────────────────
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+  // Prikaži dugme samo na hero stranici
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = '';
+});
+
+async function installPWA() {
+  if (!_installPrompt) {
+    toast('Aplikacija je već instalirana ili nije dostupna na ovom uređaju', '');
+    return;
+  }
+  _installPrompt.prompt();
+  const result = await _installPrompt.userChoice;
+  if (result.outcome === 'accepted') {
+    toast('✅ Aplikacija instalirana!', 'ok');
+    const btn = document.getElementById('install-btn');
+    if (btn) btn.style.display = 'none';
+    _installPrompt = null;
+  }
+}
+
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'none';
+  _installPrompt = null;
+});
+
 // ── Service Worker registracija ──────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
