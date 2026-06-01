@@ -2607,17 +2607,17 @@ function openRatingModal(toUserId, listingId, listingName) {
   ov.className = 'ov ov-center on';
   ov.style.cssText = 'z-index:10000';
   ov.innerHTML = `
-    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease" onclick="event.stopPropagation()">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px">⭐ Ostavi ocjenu</div>
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:18px">${listingName}</div>
-      <div id="rating-stars" style="display:flex;justify-content:center;gap:4px;margin-bottom:20px">
-        <span data-s="1" onclick="_pickStar(1)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="2" onclick="_pickStar(2)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="3" onclick="_pickStar(3)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="4" onclick="_pickStar(4)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="5" onclick="_pickStar(5)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease" onclick="event.stopPropagation()">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px;color:#fff">⭐ Ostavi ocjenu</div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:18px">${listingName}</div>
+      <div id="rating-stars" style="display:flex;justify-content:center;gap:4px;margin-bottom:12px">
+        <span data-s="1" onclick="_pickStar(1)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="2" onclick="_pickStar(2)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="3" onclick="_pickStar(3)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="4" onclick="_pickStar(4)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="5" onclick="_pickStar(5)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
       </div>
-      <div id="rating-label" style="font-size:13px;color:var(--muted);margin-bottom:16px;min-height:18px"></div>
+      <div id="rating-label" style="font-size:13px;color:#aaa;margin-bottom:16px;min-height:20px"></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('ov-rating').remove()">Odustani</button>
         <button class="btn btn-primary" style="flex:1" id="rating-submit-btn" onclick="_submitRating(${toUserId},${listingId})" disabled>Ocijeni</button>
