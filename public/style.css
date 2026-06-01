@@ -216,8 +216,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .admin-acts{display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
 
 /* TOAST */
-.toast{position:fixed;bottom:20px;right:16px;left:16px;max-width:300px;margin:0 auto;background:var(--panel);border:1px solid var(--border2);border-left:3px solid var(--orange);border-radius:6px;padding:11px 15px;font-size:13px;z-index:999;transform:translateY(100px);transition:transform .28s ease;box-shadow:0 8px 28px rgba(0,0,0,.4);}
-.toast.on{transform:translateY(0);}
+.toast{position:fixed;top:16px;right:16px;left:16px;max-width:340px;margin:0 auto;background:var(--panel);border:1px solid var(--border2);border-left:3px solid var(--orange);border-radius:8px;padding:11px 15px;font-size:13px;z-index:9999;transform:translateY(-80px);opacity:0;transition:transform .25s ease, opacity .25s ease;box-shadow:0 8px 28px rgba(0,0,0,.5);}
+.toast.on{transform:translateY(0);opacity:1;}
 .toast.ok{border-left-color:var(--green);}
 .toast.err{border-left-color:var(--red);}
 

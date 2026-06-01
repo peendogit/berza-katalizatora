@@ -389,9 +389,10 @@ function rmFile(i) {
 async function submitListing() {
   const marka = document.getElementById('f-marka').value.trim();
   if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+  const btn = document.getElementById('btn-submit-oglas');
+  if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
+  const _reEnableBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; } };
   try {
-    const btn = document.getElementById('btn-submit-oglas');
-    if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
     let imageUrls = [];
     if (uploads.length > 0) {
       const fd = new FormData();
@@ -426,7 +427,6 @@ async function submitListing() {
     toast('❌ ' + err.message, 'err');
   } finally {
     const btn = document.getElementById('novi-submit-btn');
-    const btn2 = document.getElementById('btn-submit-oglas'); if (btn2) { btn2.disabled = false; btn2.textContent = '📤 Objavi oglas'; }
   }
 }
 
@@ -1771,10 +1771,10 @@ async function renderAnalitika() {
     const maxPon = Math.max(...ponDays.map(d => d.count), 1);
 
     const statBox = (label, val, color='var(--text)', sub='') =>
-      `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;padding:14px 16px;flex:1;min-width:120px">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;color:${color};line-height:1">${val}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">${label}</div>
-        ${sub ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">${sub}</div>` : ''}
+      `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;padding:12px 14px;flex:1;min-width:80px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:${color};line-height:1">${val}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.3">${label}</div>
+        ${sub ? `<div style="font-size:10px;color:var(--muted2);margin-top:2px">${sub}</div>` : ''}
       </div>`;
 
     const barChart = (data, max, color) => `
@@ -1810,13 +1810,11 @@ async function renderAnalitika() {
     const rsActive  = activeLi.filter(l => l.country === 'RS');
 
     el.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         ${statBox('Prodavači', sellers.length, 'var(--orange)')}
         ${statBox('Otkupljivači', buyers.length, 'var(--red)')}
         ${statBox('Na čekanju', pending.length, 'var(--yellow)')}
         ${statBox('Premium', premium.length, 'var(--yellow)', premiumExpiringSoon.length ? premiumExpiringSoon.length+' ističe uskoro' : '')}
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         ${statBox('Aktivni oglasi', activeLi.length, 'var(--green)')}
         ${statBox('Završene prodaje', finishedLi.length, 'var(--green)')}
         ${statBox('BiH oglasi', ba)}
@@ -1824,7 +1822,7 @@ async function renderAnalitika() {
       </div>
 
       ${section('BiH vs Srbija', `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:12px">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted2);margin-bottom:8px">Bosna i Hercegovina</div>
             ${row('Prodavači', baSellers.length)}
