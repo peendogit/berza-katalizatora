@@ -450,3 +450,14 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 @media (min-width: 601px) {
   .bottom-nav { display: none !important; }
 }
+
+/* Broadcast banner animacija */
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* Toggle switch za email notifikacije */
+#p-email-notify + span span {
+  transition: left .3s;
+}

@@ -204,8 +204,12 @@ function loginUser(u) {
   // Normalizuj snake_case polja iz API-ja u camelCase
   if (u.premium_until && !u.premiumUntil) u.premiumUntil = new Date(u.premium_until).getTime();
   if (u.default_dana && !u.defaultDana) u.defaultDana = u.default_dana;
+  if (u.email_notify === undefined) u.emailNotify = true;
+  else u.emailNotify = u.email_notify !== false;
   CU = u;
   expireOld();
+  // Provjeri broadcast notifikacije
+  if (u.role !== 'admin') checkBroadcasts();
   // Header
   document.getElementById('hdr-guest').style.display = 'none';
   const hu = document.getElementById('hdr-user');
@@ -671,7 +675,10 @@ async function renderZavrseni() {
             🏙️ ${addr.city}<br>
             📞 ${addr.tel}
           </div>
-          ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2)">Kupac: <b style="color:var(--text)">${buyer.name}</b></div>` : ''}
+          ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span>Kupac: <b style="color:var(--text)">${buyer.name}</b></span>
+            ${acc ? `<button class="btn btn-ghost btn-sm" onclick="openRatingModal(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}')">⭐ Ocijeni kupca</button>` : ''}
+          </div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
       </div>
       <div class="zav-check-wrap">
@@ -765,6 +772,8 @@ async function renderBuyerListings() {
     const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const salesInfo = l.sales_count > 0 ? `<span class="badge" style="background:rgba(29,185,84,.12);color:var(--green);font-size:10px">✅ ${l.sales_count} prodaj${l.sales_count===1?'a':'a'}</span>` : '';
+    const ratingInfo = l.avg_rating > 0 ? `<span style="font-size:11px;color:var(--muted2)">${starsHtml(parseFloat(l.avg_rating), parseInt(l.rating_count||0), '12px')}</span>` : '';
     const ponudaBtn = moze
       ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Ponuda</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
@@ -776,8 +785,10 @@ async function renderBuyerListings() {
           ${l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
           <span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>
           ${expW}
+          ${salesInfo}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
+        ${ratingInfo ? `<div style="margin-bottom:4px">${ratingInfo}</div>` : ''}
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
           <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
@@ -923,8 +934,9 @@ async function renderBuyerZavrseni() {
           ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : '<span style="color:var(--muted)">Adresa nije unesena u profilu</span>'}
         </div>
       </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2)">
-        Prodavač: <b style="color:var(--text)">${seller.name}</b> · 📞 ${seller.tel}
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>Prodavač: <b style="color:var(--text)">${seller.name}</b> · 📞 ${seller.tel}</span>
+        <button class="btn btn-ghost btn-sm" onclick="openRatingModal(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}')">⭐ Ocijeni prodavača</button>
       </div>
     </div>`;
   }).join('');
@@ -1358,6 +1370,19 @@ function openProfil() {
       </select>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Ovo će biti automatski odabran period kad šalješ ponudu</div>
     </div>` : ''}
+    <div class="divider"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div>
+        <div style="font-size:13px;font-weight:600">📧 Email notifikacije</div>
+        <div style="font-size:11px;color:var(--muted)">Primaj email pri novim porukama i ponudama</div>
+      </div>
+      <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+        <input type="checkbox" id="p-email-notify" ${u.emailNotify!==false?'checked':''} onchange="toggleEmailNotify(this.checked)" style="opacity:0;width:0;height:0;position:absolute">
+        <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:${u.emailNotify!==false?'var(--green)':'var(--border2)'};border-radius:24px;transition:.3s">
+          <span style="position:absolute;height:18px;width:18px;left:${u.emailNotify!==false?'23':'3'}px;bottom:3px;background:#fff;border-radius:50%;transition:.3s"></span>
+        </span>
+      </label>
+    </div>
     <button class="btn btn-primary btn-sm" onclick="saveProfile()">💾 Sačuvaj</button>
     ${premiumBlock}
   `;
@@ -2495,6 +2520,170 @@ function toast(msg,type='') {
   const el=document.getElementById('toast');
   el.textContent=msg; el.className='toast on'+(type?' '+type:'');
   clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('on'),3000);
+}
+
+// ═══════════════════════════════════════════════════════
+// BROADCAST NOTIFIKACIJE
+// ═══════════════════════════════════════════════════════
+async function checkBroadcasts() {
+  try {
+    const broadcasts = await api('GET', '/broadcasts/unread');
+    if (!broadcasts.length) return;
+    // Prikaži jedan po jedan s odgodom
+    broadcasts.reverse().forEach((b, i) => {
+      setTimeout(() => showBroadcast(b), i * 400);
+    });
+  } catch(e) {}
+}
+
+function showBroadcast(b) {
+  const existing = document.getElementById('broadcast-banner');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'broadcast-banner';
+  el.style.cssText = `
+    position:fixed;top:0;left:0;right:0;z-index:9999;
+    background:linear-gradient(135deg,#1a0e00,#0a1200);
+    border-bottom:2px solid var(--orange);
+    padding:12px 16px;
+    display:flex;align-items:center;gap:12px;
+    animation:slideDown .3s ease;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+  `;
+  el.innerHTML = `
+    <span style="font-size:18px;flex-shrink:0">📢</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Obavještenje</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.4">${b.message}</div>
+    </div>
+    <button onclick="dismissBroadcast(${b.id})" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;flex-shrink:0;padding:4px">✕</button>
+  `;
+  document.body.prepend(el);
+  // Auto-dismiss nakon 10s
+  setTimeout(() => dismissBroadcast(b.id), 10000);
+}
+
+async function dismissBroadcast(id) {
+  const el = document.getElementById('broadcast-banner');
+  if (el) { el.style.opacity='0'; el.style.transform='translateY(-100%)'; el.style.transition='all .3s'; setTimeout(()=>el.remove(), 300); }
+  try { await api('POST', '/broadcasts/'+id+'/read'); } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════
+// REJTING SISTEM
+// ═══════════════════════════════════════════════════════
+function starsHtml(avg, total, size='14px') {
+  if (!avg) return `<span style="font-size:11px;color:var(--muted)">Bez ocjene</span>`;
+  const full = Math.floor(avg);
+  const half = (avg - full) >= 0.5;
+  let stars = '';
+  for(let i=1;i<=5;i++) {
+    if(i<=full) stars += `<span style="color:#f4c430;font-size:${size}">★</span>`;
+    else if(i===full+1&&half) stars += `<span style="color:#f4c430;font-size:${size};opacity:.6">★</span>`;
+    else stars += `<span style="color:rgba(255,255,255,.15);font-size:${size}">★</span>`;
+  }
+  return `<span style="display:inline-flex;align-items:center;gap:2px">${stars} <span style="font-size:11px;color:var(--muted);margin-left:3px">${avg} (${total})</span></span>`;
+}
+
+function openRatingModal(toUserId, listingId, listingName) {
+  const existing = document.getElementById('ov-rating');
+  if (existing) existing.remove();
+  let selStars = 0;
+  const ov = document.createElement('div');
+  ov.id = 'ov-rating';
+  ov.className = 'ov ov-center on';
+  ov.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px">⭐ Ostavi ocjenu</div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:18px">${listingName}</div>
+      <div id="rating-stars" style="display:flex;justify-content:center;gap:8px;margin-bottom:20px">
+        ${[1,2,3,4,5].map(s=>`<span data-s="${s}" onclick="pickStar(${s})" style="font-size:36px;cursor:pointer;color:rgba(255,255,255,.15);transition:all .15s">★</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('ov-rating').remove()">Odustani</button>
+        <button class="btn btn-primary" style="flex:1" id="rating-submit-btn" onclick="submitRating(${toUserId},${listingId})" disabled>Ocijeni</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+}
+
+function pickStar(n) {
+  document.querySelectorAll('#rating-stars span').forEach(s => {
+    const v = parseInt(s.dataset.s);
+    s.style.color = v <= n ? '#f4c430' : 'rgba(255,255,255,.15)';
+  });
+  const btn = document.getElementById('rating-submit-btn');
+  if (btn) { btn.disabled = false; btn.dataset.stars = n; }
+}
+
+async function submitRating(toUserId, listingId) {
+  const btn = document.getElementById('rating-submit-btn');
+  const stars = parseInt(btn?.dataset.stars || 0);
+  if (!stars) return;
+  try {
+    btn.disabled = true; btn.textContent = 'Šaljem...';
+    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars });
+    document.getElementById('ov-rating')?.remove();
+    toast('✅ Ocjena poslana!', 'ok');
+  } catch(err) {
+    toast('❌ ' + err.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Ocijeni'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ADMIN — BROADCAST SLANJE
+// ═══════════════════════════════════════════════════════
+async function openBroadcastModal() {
+  const existing = document.getElementById('ov-broadcast');
+  if (existing) existing.remove();
+  let histHtml = '';
+  try {
+    const hist = await api('GET', '/admin/broadcasts');
+    histHtml = hist.length ? hist.slice(0,5).map(b=>`
+      <div style="border-top:1px solid var(--border);padding:8px 0;font-size:12px">
+        <div style="color:var(--muted2)">${fmtDate(b.created_at)}</div>
+        <div style="color:var(--text);margin-top:2px">${b.message}</div>
+      </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0">Nema prethodnih obavještenja.</div>';
+  } catch(e) {}
+  const ov = document.createElement('div');
+  ov.id = 'ov-broadcast';
+  ov.className = 'ov ov-center on';
+  ov.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:24px 20px;width:100%;max-width:420px;animation:slideUp .22s ease">
+      <button onclick="document.getElementById('ov-broadcast').remove()" style="float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:16px">📢 Broadcast poruka</div>
+      <div class="fg">
+        <label>Poruka svim korisnicima</label>
+        <textarea id="bc-msg" rows="3" placeholder="Unesite obavještenje..." style="width:100%;background:var(--dark);border:1px solid var(--border2);border-radius:7px;color:var(--text);padding:10px;font-family:Barlow,sans-serif;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="sendBroadcast()">📤 Pošalji svim korisnicima</button>
+      ${histHtml ? `<div style="margin-top:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prethodna obavještenja</div>${histHtml}</div>` : ''}
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+}
+
+async function sendBroadcast() {
+  const msg = document.getElementById('bc-msg')?.value.trim();
+  if (!msg) { toast('Unesite poruku', 'err'); return; }
+  try {
+    await api('POST', '/admin/broadcast', { message: msg });
+    document.getElementById('ov-broadcast')?.remove();
+    toast('✅ Broadcast poslan svim korisnicima!', 'ok');
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
+}
+
+// ═══════════════════════════════════════════════════════
+// EMAIL NOTIFY TOGGLE (u profilu)
+// ═══════════════════════════════════════════════════════
+async function toggleEmailNotify(val) {
+  try {
+    await api('PUT', '/auth/email-notify', { email_notify: val });
+    CU.emailNotify = val;
+    toast(val ? '✅ Email notifikacije uključene' : 'Email notifikacije isključene', val ? 'ok' : '');
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
 
 // INIT
