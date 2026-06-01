@@ -381,3 +381,72 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .zav-check-wrap { display:flex; align-items:center; gap:8px; padding:10px 16px; border-top:1px solid var(--border); background:rgba(255,255,255,.02); }
 .zav-check-wrap input[type=checkbox] { width:18px; height:18px; accent-color:var(--green); cursor:pointer; }
 .zav-check-label { font-size:13px; color:var(--muted2); cursor:pointer; }
+/* ── Bottom Navigation (mobile only) ───────────────────── */
+@media (max-width: 600px) {
+  .nav-tabs { display: none !important; }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--border2);
+    z-index: 150;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav .bn-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px 6px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    transition: color .15s;
+    position: relative;
+  }
+
+  .bottom-nav .bn-item .bn-icon {
+    font-size: 20px;
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+
+  .bottom-nav .bn-item.on { color: var(--orange); }
+  .bottom-nav .bn-item:hover { color: var(--text); }
+
+  .bottom-nav .bn-badge {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 14px);
+    background: var(--orange);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 14px;
+    text-align: center;
+    display: none;
+  }
+
+  /* Dodaj padding na dnu page-a da ne bude iza bottom nav */
+  .page.on { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* FAB ide iznad bottom nav-a */
+  .fab { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Desktop — sakrij bottom nav */
+@media (min-width: 601px) {
+  .bottom-nav { display: none !important; }
+}

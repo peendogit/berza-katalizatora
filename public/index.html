@@ -129,6 +129,21 @@
       <button class="nt"    id="st-poruke"   onclick="sTab('poruke')">Poruke <span id="poruke-badge" style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
       <button class="nt"    id="st-zavrseni" onclick="sTab('zavrseni')">Završeni</button>
     </div>
+    <!-- Bottom nav (mobile) -->
+    <nav class="bottom-nav" id="seller-bottom-nav">
+      <button class="bn-item on" id="sbn-oglasi" onclick="sTab('oglasi')">
+        <span class="bn-icon">📋</span>Oglasi
+        <span class="bn-badge" id="sbn-oglasi-badge"></span>
+      </button>
+      <button class="bn-item" id="sbn-poruke" onclick="sTab('poruke')">
+        <span class="bn-icon">💬</span>Poruke
+        <span class="bn-badge" id="sbn-poruke-badge"></span>
+      </button>
+      <button class="bn-item" id="sbn-zavrseni" onclick="sTab('zavrseni')">
+        <span class="bn-icon">✅</span>Završeni
+      </button>
+    </nav>
+    </div>
     <div class="tab-pane on" id="sp-oglasi"><div id="s-oglasi"></div></div>
     <div class="tab-pane" id="sp-poruke"><div id="s-poruke"></div></div>
     <div class="tab-pane" id="sp-zavrseni"><div id="s-zavrseni"></div></div>
@@ -151,6 +166,17 @@
         <button class="nt"    id="bt-moje"    onclick="bTab('moje')">Moje ponude</button>
         <button class="nt"    id="bt-zavrseni" onclick="bTab('zavrseni')">Završeni</button>
         <button class="nt"    id="bt-poruke"  onclick="bTab('poruke')">Poruke <span id="b-poruke-badge" style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
+      </div>
+      <!-- Bottom nav (mobile) -->
+      <nav class="bottom-nav" id="buyer-bottom-nav">
+        <button class="bn-item on" id="bbn-oglasi"   onclick="bTab('oglasi')"><span class="bn-icon">🔍</span>Oglasi</button>
+        <button class="bn-item"    id="bbn-moje"     onclick="bTab('moje')"><span class="bn-icon">📤</span>Ponude</button>
+        <button class="bn-item"    id="bbn-zavrseni" onclick="bTab('zavrseni')"><span class="bn-icon">✅</span>Završeni</button>
+        <button class="bn-item"    id="bbn-poruke"   onclick="bTab('poruke')">
+          <span class="bn-icon">💬</span>Poruke
+          <span class="bn-badge" id="bbn-poruke-badge"></span>
+        </button>
+      </nav>
       </div>
       <div class="tab-pane on" id="bp-oglasi">
         <div class="sort-bar" id="sort-bar">
@@ -181,6 +207,16 @@
       <button class="nt on" id="at-users"  onclick="aTab('users')">Korisnici <span id="admin-badge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px;display:none"></span></button>
       <button class="nt"    id="at-oglasi" onclick="aTab('oglasi')">Oglasi</button>
       <button class="nt"    id="at-analitika" onclick="aTab('analitika')">📊 Analitika</button>
+    </div>
+    <!-- Bottom nav (mobile) -->
+    <nav class="bottom-nav" id="admin-bottom-nav">
+      <button class="bn-item on" id="abn-users"     onclick="aTab('users')">
+        <span class="bn-icon">👥</span>Korisnici
+        <span class="bn-badge" id="abn-badge"></span>
+      </button>
+      <button class="bn-item"    id="abn-oglasi"    onclick="aTab('oglasi')"><span class="bn-icon">📋</span>Oglasi</button>
+      <button class="bn-item"    id="abn-analitika" onclick="aTab('analitika')"><span class="bn-icon">📊</span>Analitika</button>
+    </nav>
     </div>
     <div class="tab-pane on" id="ap-users">
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">

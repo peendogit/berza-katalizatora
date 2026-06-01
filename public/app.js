@@ -297,6 +297,10 @@ function fmtCard(el) { let v=el.value.replace(/\D/g,'').slice(0,16); el.value=v.
 function sTab(n) {
   localStorage.setItem('activeTab', JSON.stringify({page:'page-seller', stab:n}));
   pushNav({page:'page-seller', stab:n});
+  // Sync bottom nav
+  ['oglasi','poruke','zavrseni'].forEach(x => {
+    const b = document.getElementById('sbn-'+x); if (b) b.classList.toggle('on', x===n);
+  });
   ['oglasi','poruke','zavrseni'].forEach(x => {
     const t=document.getElementById('st-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('sp-'+x); if(p) p.classList.toggle('on',x===n);
@@ -309,6 +313,10 @@ function sTab(n) {
 function bTab(n) {
   localStorage.setItem('activeTab', JSON.stringify({page:'page-buyer', btab:n}));
   pushNav({page:'page-buyer', btab:n});
+  // Sync bottom nav
+  ['oglasi','moje','zavrseni','poruke'].forEach(x => {
+    const b = document.getElementById('bbn-'+x); if (b) b.classList.toggle('on', x===n);
+  });
   ['oglasi','moje','zavrseni','poruke'].forEach(x => {
     const t=document.getElementById('bt-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('bp-'+x); if(p) p.classList.toggle('on',x===n);
@@ -322,6 +330,10 @@ function bTab(n) {
 function aTab(n) {
   localStorage.setItem('activeTab', JSON.stringify({page:'page-admin', atab:n}));
   pushNav({page:'page-admin', atab:n});
+  // Sync bottom nav
+  ['users','oglasi','analitika'].forEach(x => {
+    const b = document.getElementById('abn-'+x); if (b) b.classList.toggle('on', x===n);
+  });
   ['users','oglasi','analitika'].forEach(x => {
     const t=document.getElementById('at-'+x); if(t) t.classList.toggle('on',x===n);
     const p=document.getElementById('ap-'+x); if(p) p.classList.toggle('on',x===n);
@@ -1065,10 +1077,14 @@ function updatePorukeBadges() {
     const cnt = myIds.filter(lid => hasUnread(lid)).length;
     const b = document.getElementById('poruke-badge');
     if (b) { b.style.display = cnt ? 'inline' : 'none'; b.textContent = cnt; }
+    const bb = document.getElementById('sbn-poruke-badge');
+    if (bb) { bb.style.display = cnt ? 'block' : 'none'; bb.textContent = cnt; }
   } else if (CU.role === 'buyer') {
     const cnt = LISTINGS.filter(l => hasUnread(l.id)).length;
     const b = document.getElementById('b-poruke-badge');
     if (b) { b.style.display = cnt ? 'inline' : 'none'; b.textContent = cnt; }
+    const bb = document.getElementById('bbn-poruke-badge');
+    if (bb) { bb.style.display = cnt ? 'block' : 'none'; bb.textContent = cnt; }
   }
 }
 
