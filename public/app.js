@@ -1190,11 +1190,17 @@ function openLightbox(src, gallery) {
   if (_lbIdx < 0) _lbIdx = 0;
   _lbRender();
   document.getElementById('lightbox').classList.add('on');
+  // Dodaj history entry da back dugme zatvori lightbox
+  history.pushState({ lightbox: true }, '');
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('on');
+  const lb = document.getElementById('lightbox');
+  if (!lb || !lb.classList.contains('on')) return;
+  lb.classList.remove('on');
   _lbGallery = []; _lbIdx = 0;
+  // Ukloni history entry od lightboxa
+  if (history.state && history.state.lightbox) history.back();
 }
 
 function lbNav(dir) {
@@ -1216,6 +1222,15 @@ function _lbRender() {
 // Zatvori klik na pozadinu
 document.addEventListener('click', e => {
   if (e.target.id === 'lightbox') closeLightbox();
+});
+// Back dugme zatvara lightbox
+window.addEventListener('popstate', e => {
+  const lb = document.getElementById('lightbox');
+  if (lb && lb.classList.contains('on')) {
+    lb.classList.remove('on');
+    _lbGallery = []; _lbIdx = 0;
+    // Ne pozivaj closeLightbox() da izbjegnemo rekurziju
+  }
 });
 // Strelice na tastaturi
 document.addEventListener('keydown', e => {
