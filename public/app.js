@@ -559,11 +559,14 @@ function buildPonudeList(l) {
     const bg   = isAcc?'var(--gL)':isDec?'rgba(0,0,0,.15)':'rgba(255,255,255,.03)';
     const bc   = isAcc?'rgba(29,185,84,.2)':isDec?'var(--border)':'var(--border2)';
     return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${isDec?.5:1}">
-      <div class="ponuda-av" style="background:${col}">${initials(buyerName)}</div>
+      <div class="ponuda-av" style="background:${col};cursor:pointer" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${initials(buyerName)}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${buyerName} ${verB} ${stB}</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'}";flex-shrink:0>${p.cijena} KM</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>
+            ${verB} ${stB}
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}</div>
         ${telB}${msgB}
@@ -795,7 +798,7 @@ async function renderBuyerListings() {
         </div>
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b></div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
           <div class="oglas-actions">
             <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
@@ -1622,13 +1625,10 @@ async function toggleUserDetail(uid) {
   } catch(e) {}
 
   let h=`<div style="padding:4px 0">`;
-  // ── Info korisnika ──
-  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-    <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
-    <div>
-      <div style="font-size:11px;color:var(--muted)">Registrovan: ${fmtDate(new Date(u.created_at).getTime())}</div>
-      ${u.premium && u.premiumUntil ? `<div style="font-size:11px;color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</div>` : ''}
-    </div>
+  // Samo datum i premium — ime/email/grad/tel već vidljivi na kartici iznad
+  h+=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+    Registrovan: ${fmtDate(new Date(u.created_at).getTime())}
+    ${u.premium && u.premiumUntil ? ` &nbsp;·&nbsp; <span style="color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</span>` : ''}
   </div>
   <div class="divider"></div>`;
 
