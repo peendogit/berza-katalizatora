@@ -772,8 +772,8 @@ async function renderBuyerListings() {
     const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
-    const salesInfo = l.sales_count > 0 ? `<span class="badge" style="background:rgba(29,185,84,.12);color:var(--green);font-size:10px">✅ ${l.sales_count} prodaj${l.sales_count===1?'a':'a'}</span>` : '';
-    const ratingInfo = l.avg_rating > 0 ? `<span style="font-size:11px;color:var(--muted2)">${starsHtml(parseFloat(l.avg_rating), parseInt(l.rating_count||0), '12px')}</span>` : '';
+    const salesInfo = '';
+    const ratingInfo = '';
     const ponudaBtn = moze
       ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Ponuda</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
@@ -791,7 +791,7 @@ async function renderBuyerListings() {
         ${ratingInfo ? `<div style="margin-bottom:4px">${ratingInfo}</div>` : ''}
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
           <div class="oglas-actions">
             <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
@@ -2611,11 +2611,11 @@ function openRatingModal(toUserId, listingId, listingName) {
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px">⭐ Ostavi ocjenu</div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:18px">${listingName}</div>
       <div id="rating-stars" style="display:flex;justify-content:center;gap:4px;margin-bottom:20px">
-        <span data-s="1" onclick="_pickStar(1)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="2" onclick="_pickStar(2)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="3" onclick="_pickStar(3)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="4" onclick="_pickStar(4)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="5" onclick="_pickStar(5)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="1" onclick="_pickStar(1)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="2" onclick="_pickStar(2)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="3" onclick="_pickStar(3)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="4" onclick="_pickStar(4)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="5" onclick="_pickStar(5)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.35);transition:color .1s;user-select:none;line-height:1">★</span>
       </div>
       <div id="rating-label" style="font-size:13px;color:var(--muted);margin-bottom:16px;min-height:18px"></div>
       <div style="display:flex;gap:10px">
