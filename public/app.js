@@ -566,6 +566,7 @@ async function togglePP(lid) {
       msg: '', time: new Date(p.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'}),
       status: p.status, dani: p.dani,
       buyerName: p.buyer_name, buyerCity: p.buyer_city, buyerTel: p.buyer_tel, buyerAddr: p.buyer_addr,
+      buyerTx: parseInt(p.buyer_transactions) || 0,
       premium: false
     }));
     // Ažuriraj lokalni LISTINGS
@@ -599,7 +600,7 @@ function buildPonudeList(l) {
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>
+            <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>${p.buyerTx > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${p.buyerTx})</span>` : ''}
             ${verB} ${stB}
           </div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
