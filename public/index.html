@@ -221,10 +221,17 @@
     </nav>
     </div>
     <div class="tab-pane on" id="ap-users">
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Uloga:</span>
         <button class="btn btn-primary btn-xs" id="af-all"    onclick="setAdminFilter('all')">Svi</button>
         <button class="btn btn-ghost btn-xs"   id="af-seller" onclick="setAdminFilter('seller')">Prodavači</button>
         <button class="btn btn-ghost btn-xs"   id="af-buyer"  onclick="setAdminFilter('buyer')">Otkupljivači</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Država:</span>
+        <button class="btn btn-primary btn-xs" id="afc-all" onclick="setAdminCountry('all')">Sve</button>
+        <button class="btn btn-ghost btn-xs"   id="afc-BA"  onclick="setAdminCountry('BA')">🇧🇦 BiH</button>
+        <button class="btn btn-ghost btn-xs"   id="afc-RS"  onclick="setAdminCountry('RS')">🇷🇸 Srbija</button>
       </div>
       <div class="fg" style="margin-bottom:12px"><input id="admin-search" placeholder="🔍 Pretraži (ime, email, grad)..." oninput="renderAdminUsers()"></div>
       <div id="a-users"></div>

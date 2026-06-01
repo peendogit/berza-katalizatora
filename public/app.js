@@ -791,7 +791,7 @@ async function renderBuyerListings() {
         ${ratingInfo ? `<div style="margin-bottom:4px">${ratingInfo}</div>` : ''}
         ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
           <div class="oglas-actions">
             <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
@@ -1430,11 +1430,23 @@ function showConfirm(title,msg,okLabel,cb) {
 // ═══════════════════════════════════════════════════════
 // ADMIN
 // ═══════════════════════════════════════════════════════
+let adminFilterRole = 'all';
+let adminFilterCountry = 'all';
+
 function setAdminFilter(f) {
-  adminFilter=f;
+  adminFilterRole = f;
   ['all','seller','buyer'].forEach(x=>{
     const b=document.getElementById('af-'+x);
-    if(b){ b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost'); }
+    if(b) b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost');
+  });
+  renderAdminUsers();
+}
+
+function setAdminCountry(c) {
+  adminFilterCountry = c;
+  ['all','BA','RS'].forEach(x=>{
+    const b=document.getElementById('afc-'+x);
+    if(b) b.className='btn btn-xs '+(x===c?'btn-primary':'btn-ghost');
   });
   renderAdminUsers();
 }
@@ -1449,7 +1461,9 @@ async function renderAdminUsers() {
       defaultDana: u.default_dana || 3
     }));
   } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
-  let list=USERS.filter(u=>u.role!=='admin'&&(adminFilter==='all'||u.role===adminFilter));
+  let list=USERS.filter(u=>u.role!=='admin');
+  if (adminFilterRole !== 'all') list = list.filter(u => u.role === adminFilterRole);
+  if (adminFilterCountry !== 'all') list = list.filter(u => (u.country||'BA').toUpperCase() === adminFilterCountry);
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
   const pend=list.filter(u=>u.status==='pending');
   const rest=list.filter(u=>u.status!=='pending');
@@ -2554,9 +2568,9 @@ function showBroadcast(b) {
     <span style="font-size:18px;flex-shrink:0">📢</span>
     <div style="flex:1;min-width:0">
       <div style="font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Obavještenje</div>
-      <div style="font-size:13px;color:var(--text);line-height:1.4">${b.message}</div>
+      <div style="font-size:13px;color:#f5a623;line-height:1.4;font-weight:500">${b.message}</div>
     </div>
-    <button onclick="dismissBroadcast(${b.id})" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;flex-shrink:0;padding:4px">✕</button>
+    <button onclick="dismissBroadcast(${b.id})" style="background:none;border:none;color:var(--orange);font-size:20px;cursor:pointer;flex-shrink:0;padding:4px;opacity:.8">✕</button>
   `;
   document.body.prepend(el);
   // Auto-dismiss nakon 10s
@@ -2588,43 +2602,53 @@ function starsHtml(avg, total, size='14px') {
 function openRatingModal(toUserId, listingId, listingName) {
   const existing = document.getElementById('ov-rating');
   if (existing) existing.remove();
-  let selStars = 0;
   const ov = document.createElement('div');
   ov.id = 'ov-rating';
   ov.className = 'ov ov-center on';
+  ov.style.cssText = 'z-index:10000';
   ov.innerHTML = `
-    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease">
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease" onclick="event.stopPropagation()">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px">⭐ Ostavi ocjenu</div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:18px">${listingName}</div>
-      <div id="rating-stars" style="display:flex;justify-content:center;gap:8px;margin-bottom:20px">
-        ${[1,2,3,4,5].map(s=>`<span data-s="${s}" onclick="pickStar(${s})" style="font-size:36px;cursor:pointer;color:rgba(255,255,255,.15);transition:all .15s">★</span>`).join('')}
+      <div id="rating-stars" style="display:flex;justify-content:center;gap:4px;margin-bottom:20px">
+        <span data-s="1" onclick="_pickStar(1)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="2" onclick="_pickStar(2)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="3" onclick="_pickStar(3)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="4" onclick="_pickStar(4)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
+        <span data-s="5" onclick="_pickStar(5)" style="font-size:42px;cursor:pointer;color:rgba(255,255,255,.2);transition:color .1s;user-select:none;line-height:1">★</span>
       </div>
+      <div id="rating-label" style="font-size:13px;color:var(--muted);margin-bottom:16px;min-height:18px"></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('ov-rating').remove()">Odustani</button>
-        <button class="btn btn-primary" style="flex:1" id="rating-submit-btn" onclick="submitRating(${toUserId},${listingId})" disabled>Ocijeni</button>
+        <button class="btn btn-primary" style="flex:1" id="rating-submit-btn" onclick="_submitRating(${toUserId},${listingId})" disabled>Ocijeni</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
 }
 
-function pickStar(n) {
+const _starLabels = ['','😕 Loše','😐 Ispod prosjeka','🙂 Solidno','😊 Dobro','🤩 Odlično'];
+let _selectedStars = 0;
+
+function _pickStar(n) {
+  _selectedStars = n;
   document.querySelectorAll('#rating-stars span').forEach(s => {
-    const v = parseInt(s.dataset.s);
-    s.style.color = v <= n ? '#f4c430' : 'rgba(255,255,255,.15)';
+    s.style.color = parseInt(s.dataset.s) <= n ? '#f4c430' : 'rgba(255,255,255,.2)';
   });
+  const lbl = document.getElementById('rating-label');
+  if (lbl) lbl.textContent = _starLabels[n] || '';
   const btn = document.getElementById('rating-submit-btn');
-  if (btn) { btn.disabled = false; btn.dataset.stars = n; }
+  if (btn) btn.disabled = false;
 }
 
-async function submitRating(toUserId, listingId) {
+async function _submitRating(toUserId, listingId) {
+  if (!_selectedStars) return;
   const btn = document.getElementById('rating-submit-btn');
-  const stars = parseInt(btn?.dataset.stars || 0);
-  if (!stars) return;
   try {
-    btn.disabled = true; btn.textContent = 'Šaljem...';
-    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars });
+    if (btn) { btn.disabled = true; btn.textContent = 'Šaljem...'; }
+    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars: _selectedStars });
     document.getElementById('ov-rating')?.remove();
+    _selectedStars = 0;
     toast('✅ Ocjena poslana!', 'ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
@@ -2682,6 +2706,11 @@ async function toggleEmailNotify(val) {
   try {
     await api('PUT', '/auth/email-notify', { email_notify: val });
     CU.emailNotify = val;
+    // Vizuelno ažuriraj slider
+    const span = document.querySelector('#p-email-notify + span');
+    const knob = document.querySelector('#p-email-notify + span span');
+    if (span) span.style.background = val ? 'var(--green)' : 'var(--border2)';
+    if (knob) knob.style.left = val ? '23px' : '3px';
     toast(val ? '✅ Email notifikacije uključene' : 'Email notifikacije isključene', val ? 'ok' : '');
   } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
