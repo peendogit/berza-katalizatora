@@ -413,7 +413,8 @@ app.get('/api/listings/:id', auth, async (req, res) => {
     let ponudeQuery, ponudeParams;
     if (req.user.role === 'seller' && listing.user_id === req.user.id) {
       ponudeQuery = `
-        SELECT p.*, u.name as buyer_name, u.city as buyer_city, u.tel as buyer_tel, u.addr as buyer_addr
+        SELECT p.*, u.name as buyer_name, u.city as buyer_city, u.tel as buyer_tel, u.addr as buyer_addr,
+               (SELECT COUNT(*) FROM ponude pp WHERE pp.buyer_id = p.buyer_id AND pp.status = 'accepted') as buyer_transactions
         FROM ponude p JOIN users u ON u.id = p.buyer_id
         WHERE p.listing_id = $1 ORDER BY p.cijena DESC`;
       ponudeParams = [req.params.id];
