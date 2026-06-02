@@ -530,13 +530,11 @@ async function renderMyListings() {
           <div class="s-oglas-meta" style="color:var(--muted)">
             📅 ${fmtDate(l.createdAt)}
             ${soldDate ? ' &nbsp;·&nbsp; ✅ Prodano: '+soldDate : ''}
-            ${!soldDate ? ' &nbsp;·&nbsp; ' + (l.ponude.length
-              ? '✅ Ima ponuda — oglas ne ističe'
-              : rem > 0
-                ? (rem <= 3
-                    ? '<span style="color:var(--yellow)">⚠️ Ističe za '+rem+' '+(rem===1?'dan':'dana')+'</span>'
-                    : 'Ističe za '+rem+' '+(rem===1?'dan':'dana'))
-                : '<span style="color:var(--red)">Istekao</span>') : ''}
+            ${!soldDate ? ' &nbsp;·&nbsp; ' + (rem > 0
+              ? (rem <= 3
+                  ? '<span style="color:var(--yellow)">⚠️ Ističe za '+rem+' '+(rem===1?'dan':'dana')+'</span>'
+                  : 'Ističe za '+rem+' '+(rem===1?'dan':'dana'))
+              : '<span style="color:var(--red)">Istekao</span>') : ''}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${badge}</div>
         </div>
