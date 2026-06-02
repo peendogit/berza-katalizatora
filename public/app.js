@@ -2648,6 +2648,23 @@ window.addEventListener('popstate', e => {
   }
 });
 
+// Kompatibilni aliasi za navigacijske funkcije
+function pushNav(state) {
+  history.pushState(state, '');
+}
+
+function restoreNav(state) {
+  if (!state) return;
+  if (state.page) {
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+    const pg = document.getElementById(state.page);
+    if (pg) pg.style.display = '';
+  }
+  if (state.stab) sTabSilent(state.stab);
+  if (state.btab) bTabSilent(state.btab);
+  if (state.atab) aTabSilent(state.atab);
+}
+
 // Init state pri učitavanju
 history.replaceState({ backStack: 0 }, '');
 
