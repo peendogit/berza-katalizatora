@@ -1913,7 +1913,7 @@ async function renderAnalitika() {
     const baActive  = activeLi.filter(l => l.country === 'BA');
     const rsActive  = activeLi.filter(l => l.country === 'RS');
 
-    el.innerHTML = `
+    el.innerHTML = `<div style="max-width:520px;margin:0 auto">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         ${statBox('Prodavači', sellers.length, 'var(--orange)')}
         ${statBox('Otkupljivači', buyers.length, 'var(--red)')}
@@ -1959,7 +1959,7 @@ async function renderAnalitika() {
         ${premiumExpiringSoon.length ? row('Premium ističe za 30 dana', premiumExpiringSoon.length, 'var(--yellow)') : ''}
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
-      `)}`;
+      `)}</div>`;
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
@@ -2734,9 +2734,8 @@ async function openUserProfile(userId, userName) {
   if (existing) existing.remove();
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
-  // Uvijek centar, ali na mobilnom scroll na vrh
   ov.className = 'ov ov-center on';
-  ov.style.cssText = 'z-index:10001;align-items:flex-start;padding-top:80px;';
+  ov.style.cssText = 'z-index:10001;align-items:flex-start;padding-top:72px;overflow-y:auto;';
   ov.innerHTML = `
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
