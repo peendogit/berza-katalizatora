@@ -372,12 +372,25 @@ async function resizeImage(file, maxPx=900, quality=0.72) {
 }
 
 async function handleFiles(files) {
-  for (const f of files) {
-    if (!f.type.startsWith('image/')) continue;
-    const resized = await resizeImage(f);
+  const pg = document.getElementById('prev-grid');
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if (!arr.length) return;
+  // Progress prikaz
+  const progId = 'upload-prog';
+  let progEl = document.getElementById(progId);
+  if (!progEl) {
+    progEl = document.createElement('div');
+    progEl.id = progId;
+    progEl.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 0;margin-bottom:4px';
+    pg.parentNode.insertBefore(progEl, pg);
+  }
+  for (let i = 0; i < arr.length; i++) {
+    progEl.textContent = `Obrađujem ${i+1}/${arr.length}...`;
+    const resized = await resizeImage(arr[i]);
     uploads.push(resized);
   }
-  document.getElementById('prev-grid').innerHTML = uploads.map((f,i)=>
+  progEl.remove();
+  pg.innerHTML = uploads.map((f,i)=>
     `<div class="prev-item"><img src="${URL.createObjectURL(f)}" onclick="openLightbox(this.src)" style="cursor:zoom-in"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${i})">✕</button></div>`
   ).join('');
 }
@@ -744,11 +757,11 @@ async function renderZavrseni() {
             🏙️ ${addr.city}<br>
             📞 ${addr.tel}
           </div>
-          ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
-            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : ''}
-          </div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
+        ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
+          ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : ''}
+        </div>` : ''}
       </div>
       <div class="zav-check-wrap">
         <input type="checkbox" id="chk-${l.id}" ${isPoslato?'checked':''} onchange="togglePoslato(${l.id},this.checked)">
@@ -2731,10 +2744,11 @@ function openLotDetail(lid) {
     </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  // Back dugme zatvara lot modal
+  history.pushState({ lotModal: true }, '');
+  const _lotPop = () => { ov.remove(); window.removeEventListener('popstate', _lotPop); };
+  window.addEventListener('popstate', _lotPop);
 }
-
-// ═══════════════════════════════════════════════════════
-// BROADCAST NOTIFIKACIJE
 // ═══════════════════════════════════════════════════════
 async function checkBroadcasts() {
   try {
