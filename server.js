@@ -131,11 +131,31 @@ const upload = multer({
 });
 
 // ─── JWT Auth Middleware ──────────────────────────────────
+// In-memory session cache: userId -> sessionToken
+const _sessionCache = new Map();
+
 function auth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Niste prijavljeni' });
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    // Ako token ima session_token (st), provjeri da li je aktivan
+    if (decoded.st) {
+      const cached = _sessionCache.get(decoded.id);
+      if (cached !== undefined) {
+        // Imamo cached vrijednost — provjeri odmah
+        if (cached !== decoded.st) {
+          return res.status(401).json({ error: 'Prijavljeni ste na drugom uređaju. Molimo prijavite se ponovo.' });
+        }
+      } else {
+        // Fetchaj iz baze i cachej (async, ali odbij ako se razlikuje)
+        pool.query('SELECT session_token FROM users WHERE id = $1', [decoded.id])
+          .then(r => {
+            if (r.rows[0]) _sessionCache.set(decoded.id, r.rows[0].session_token);
+          }).catch(() => {});
+      }
+    }
+    req.user = decoded;
     next();
   } catch {
     res.status(401).json({ error: 'Token nije validan' });
@@ -189,7 +209,10 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country }, JWT_SECRET, { expiresIn: '30d' });
+    const sessionToken = require('crypto').randomBytes(32).toString('hex');
+    await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [sessionToken, user.id]);
+    _sessionCache.set(user.id, sessionToken);
+    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country, st: sessionToken }, JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({ user, token });
   } catch (err) {
     console.error('Register error:', err);
@@ -216,7 +239,17 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Pogrešan email ili lozinka' });
 
     delete user.password_hash;
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country }, JWT_SECRET, { expiresIn: '30d' });
+
+    // Novi session token — poništava sve prethodne sesije
+    const sessionToken = require('crypto').randomBytes(32).toString('hex');
+    await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [sessionToken, user.id]);
+    // Ažuriraj in-memory cache odmah
+    _sessionCache.set(user.id, sessionToken);
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role, email: user.email, country: user.country, st: sessionToken },
+      JWT_SECRET, { expiresIn: '30d' }
+    );
 
     res.json({ user, token });
   } catch (err) {
@@ -1242,6 +1275,7 @@ app.get('*', (req, res) => {
       )
     `);
 
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS session_token VARCHAR(64)`);
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS listing_type VARCHAR(10) DEFAULT 'single'`);
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS lot_items JSONB DEFAULT '[]'`);
 
