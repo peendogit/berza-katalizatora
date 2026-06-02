@@ -742,7 +742,9 @@ async function renderZavrseni() {
     const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
     const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
     const isPoslato = poslatoSet.has(l.id);
-    const isOpen = true; // uvijek otvoreno da se vidi adresa i ocjena
+    const isOpen = !isPoslato; // poslato su zatvorene, ostale otvorene
+
+    const rateBtn = buyer && acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : '';
 
     return `<div class="zav-card${isPoslato?' poslato':''}${isOpen?' open':''}" id="zav-${l.id}">
       <div class="zav-header" onclick="toggleZav(${l.id})">
@@ -765,11 +767,9 @@ async function renderZavrseni() {
             📞 ${addr.tel}
           </div>
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
-        ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
-          ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : ''}
-        </div>` : ''}
+        ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2)">Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></div>` : ''}
       </div>
+      ${rateBtn ? `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">${rateBtn}</div>` : ''}
       <div class="zav-check-wrap">
         <input type="checkbox" id="chk-${l.id}" ${isPoslato?'checked':''} onchange="togglePoslato(${l.id},this.checked)">
         <label class="zav-check-label" for="chk-${l.id}">Označeno kao poslato</label>
@@ -788,21 +788,17 @@ async function togglePoslato(lid, checked) {
     await api('PUT', '/listings/'+lid+'/status', { status: checked ? 'sent' : 'finished' });
     if (checked) poslatoSet.add(lid); else poslatoSet.delete(lid);
     invalidateListingsCache();
-    // Samo ažuriraj vizual te kartice, ne rerenderuj sve
     const card = document.getElementById('zav-'+lid);
     if (card) {
       if (checked) {
         card.classList.add('poslato');
-        // Sakrij addr blok, ostavi ocijeni kupca vidljivo
-        const addrBox = card.querySelector('.zav-addr-box');
-        if (addrBox) addrBox.style.display = 'none';
-        const badge = card.querySelector('.badge');
+        card.classList.remove('open'); // sakrij adresu
+        const badge = card.querySelector('.zav-header .badge');
         if (badge) { badge.textContent = '✅ Poslato'; badge.className = 'badge b-ok'; badge.style.flexShrink='0'; }
       } else {
         card.classList.remove('poslato');
-        const addrBox = card.querySelector('.zav-addr-box');
-        if (addrBox) addrBox.style.display = '';
-        const badge = card.querySelector('.badge');
+        card.classList.add('open'); // prikaži adresu
+        const badge = card.querySelector('.zav-header .badge');
         if (badge) { badge.textContent = '📦 Za slanje'; badge.className = 'badge b-wait'; badge.style.flexShrink='0'; }
       }
     }
