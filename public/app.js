@@ -858,13 +858,17 @@ async function renderBuyerListings() {
       ${thumb}
       <div class="oglas-body">
         ${isLot
-          ? `<div class="oglas-title"><span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-right:5px;vertical-align:middle">LOT</span>📦 ${lotCount} katalizatora</div>`
+          ? `<div class="oglas-title" style="cursor:pointer" onclick="event.stopPropagation();openLotDetail(${l.id})">
+               <span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-right:5px;vertical-align:middle">LOT</span>
+               📦 ${lotCount} katalizatora
+               <span style="font-size:11px;color:var(--orange);margin-left:4px">▸ detalji</span>
+             </div>`
           : `<div class="oglas-title">${l.marka} ${l.model}${l.god ? ' (' + l.god + ')' : ''}</div>`
         }
         <div class="oglas-badges">
           ${!isLot && l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
           ${!isLot ? `<span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>` : ''}
-          ${isLot && lotPreview ? `<span style="font-size:11px;color:var(--muted2)">OEM: ${lotPreview}</span>` : ''}
+          ${isLot && lotPreview ? `<span style="font-size:11px;color:var(--muted2);cursor:pointer" onclick="event.stopPropagation();openLotDetail(${l.id})">OEM: ${lotPreview}</span>` : ''}
           ${expW}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
@@ -2070,10 +2074,10 @@ function addLotRow() {
     <div style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${count+1}</div>
     <input placeholder="OEM broj (opcija)" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
     <select style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 8px;font-family:Barlow,sans-serif;font-size:12px;flex-shrink:0" class="lot-stanje">
-      <option value="Originalni — neoštećen">Originalni</option>
+      <option value="Originalni — neoštećen" selected>Originalni</option>
       <option value="Malo oštećen">Malo oštećen</option>
       <option value="Zapušen / pokvaren">Zapušen</option>
-      <option value="Nepoznato" selected>Nepoznato</option>
+      <option value="Nepoznato">Nepoznato</option>
     </select>
     <button onclick="removeLotRow('lot-row-${id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;padding:2px 4px">×</button>`;
   container.appendChild(row);
@@ -2687,6 +2691,49 @@ function toast(msg,type='') {
   const el=document.getElementById('toast');
   el.textContent=msg; el.className='toast on'+(type?' '+type:'');
   clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('on'),3000);
+}
+
+function openLotDetail(lid) {
+  const l = LISTINGS.find(x => x.id === lid);
+  if (!l) return;
+  const items = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
+  const existing = document.getElementById('ov-lot-detail');
+  if (existing) existing.remove();
+  const ov = document.createElement('div');
+  ov.id = 'ov-lot-detail';
+  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding-top:64px;overflow-y:auto';
+  const rows = items.map((it, i) => {
+    const stBadge = it.stanje === 'Originalni — neoštećen'
+      ? `<span style="color:#1db954;font-size:11px">✅ Originalni</span>`
+      : it.stanje === 'Malo oštećen'
+        ? `<span style="color:var(--yellow);font-size:11px">⚠️ Malo oštećen</span>`
+        : it.stanje === 'Zapušen / pokvaren'
+          ? `<span style="color:var(--red);font-size:11px">❌ Zapušen</span>`
+          : `<span style="color:var(--muted);font-size:11px">— Nepoznato</span>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${i+1}</span>
+      <span style="flex:1;font-size:13px;color:${it.broj?'var(--text)':'var(--muted)'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400}">${it.broj || '— bez OEM broja'}</span>
+      ${stBadge}
+    </div>`;
+  }).join('');
+  ov.innerHTML = `
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:420px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <span style="background:var(--orange);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-right:8px">LOT</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#fff">📦 ${items.length} katalizatora</span>
+        </div>
+        <button onclick="document.getElementById('ov-lot-detail').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1">✕</button>
+      </div>
+      ${l.nap ? `<div style="font-size:12px;color:var(--muted2);background:rgba(255,255,255,.04);border-radius:6px;padding:8px 10px;margin-bottom:12px">📝 ${l.nap}</div>` : ''}
+      <div style="max-height:55vh;overflow-y:auto">${rows}</div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="document.getElementById('ov-lot-detail').remove()">Zatvori</button>
+        <button class="btn btn-green btn-sm" style="flex:1" onclick="document.getElementById('ov-lot-detail').remove();openPonudaOv(${lid},'Lot ${items.length} kom')">📤 Pošalji ponudu</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
 }
 
 // ═══════════════════════════════════════════════════════
