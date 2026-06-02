@@ -2301,7 +2301,7 @@ function applyTheme(t) {
   currentTheme = t;
   document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : '');
   const btn = document.getElementById('theme-btn');
-  if (btn) btn.textContent = t === 'light' ? '🌑' : '🌙';
+  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
   localStorage.setItem('theme', t);
 }
 
