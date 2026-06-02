@@ -636,7 +636,7 @@ function buildPonudeList(l) {
           </div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}</div>
         ${telB}${msgB}
         ${acts ? `<div style="display:flex;gap:6px;margin-top:8px">${acts}</div>` : ''}
       </div>
@@ -854,7 +854,11 @@ async function renderBuyerListings() {
   }
   const postarina = `<div class="postarina-bar">ℹ️ <b>Napomena:</b> Otkupljivač snosi sve troškove poštarine i transporta.</div>`;
   const moze = canBid();
-  el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
+  const PG = 20;
+  const pg = window._buyerOglasiPage || 0;
+  const paginated = active.slice(0, (pg + 1) * PG);
+  const hasMore = active.length > paginated.length;
+  el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + paginated.map(l => {
     const seller = getOwner(l);
     const isLot = l.listing_type === 'lot';
     const lotItems = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
@@ -863,9 +867,9 @@ async function renderBuyerListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'🔧'}</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'🪙'}</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
-    const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
     const ponudaBtn = moze
       ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : l.marka+' '+l.model}')">` + oglasBtnLabel + `</button>`
@@ -898,7 +902,8 @@ async function renderBuyerListings() {
         </div>
       </div>
     </div>`;
-  }).join('') + '</div>';
+  }).join('') + '</div>' +
+  (hasMore ? `<div style="text-align:center;margin:16px 0"><button class="btn btn-ghost" onclick="window._buyerOglasiPage=(window._buyerOglasiPage||0)+1;renderBuyerListings()">Učitaj još (${active.length - paginated.length})</button></div>` : '');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1065,7 +1070,11 @@ function renderMyPonude() {
     return;
   }
   const sortedPonude = [...ponudeList].sort((a,b) => (b.createdAt||b.expiresAt||0) - (a.createdAt||a.expiresAt||0));
-  el.innerHTML=sortedPonude.map(mp=>{
+  const PG = 20;
+  const pg = window._buyerPonudePage || 0;
+  const paginated = sortedPonude.slice(0, (pg + 1) * PG);
+  const hasMore = sortedPonude.length > paginated.length;
+  el.innerHTML = paginated.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
@@ -1088,7 +1097,8 @@ function renderMyPonude() {
     </div>`;
   }).join('');
   // Wrap u card
-  el.innerHTML = `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;overflow:hidden">${el.innerHTML}</div>`;
+  el.innerHTML = `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;overflow:hidden">${el.innerHTML}</div>` +
+    (hasMore ? `<div style="text-align:center;margin:12px 0"><button class="btn btn-ghost" onclick="window._buyerPonudePage=(window._buyerPonudePage||0)+1;renderMyPonude()">Učitaj još (${sortedPonude.length - paginated.length})</button></div>` : '');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2009,44 +2019,95 @@ async function renderAnalitika() {
   }
 }
 
+async function admToggleOglas(id) {
+  const el = document.getElementById('adm-det-'+id);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  if (isOpen) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  // Fetchuj ponude ako nisu već učitane
+  if (!el.dataset.loaded) {
+    el.dataset.loaded = '1';
+    const ponudeEl = document.getElementById('adm-ponude-'+id);
+    if (ponudeEl) {
+      ponudeEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Učitavam ponude...</span>';
+      try {
+        const ponude = await api('GET', '/admin/listings/'+id+'/ponude');
+        if (!ponude.length) {
+          ponudeEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Nema ponuda.</span>';
+        } else {
+          const accepted = ponude.find(p => p.status === 'accepted');
+          ponudeEl.innerHTML = ponude.map(p => {
+            const isAcc = p.status === 'accepted';
+            const isRej = p.status === 'rejected';
+            const col = isAcc ? 'var(--green)' : isRej ? 'var(--muted)' : 'var(--text)';
+            const badge = isAcc ? '✅' : isRej ? '❌' : '⏳';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
+              <span style="font-size:12px">${badge}</span>
+              <span style="flex:1;font-size:12px;color:var(--text)">${p.buyer_name} <span style="color:var(--muted)">(${p.buyer_city||'—'})</span></span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
+              <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
+            </div>`;
+          }).join('');
+        }
+      } catch(e) {
+        ponudeEl.innerHTML = '<span style="color:var(--red);font-size:11px">Greška pri učitavanju ponuda.</span>';
+      }
+    }
+  }
+}
+
 async function renderAdminOglasi() {
-  const el=document.getElementById('a-oglasi');
+  const el = document.getElementById('a-oglasi');
   try {
     const data = await cachedListings();
     LISTINGS = data.map(parseListing);
   } catch(e) { toast('Greška', 'err'); return; }
-  el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
-    const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status;
-    const stColor = l.status==='active'?'ok':'wait';
-    return `<div class="admin-oglas-card" id="ac-l-${l.id}" >
-      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px" onclick="admToggleOglas(${l.id})">
-        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
+
+  const PG = 20;
+  const pg = window._adminOglasiPage || 0;
+  const all = LISTINGS;
+  const paginated = all.slice(0, (pg + 1) * PG);
+  const hasMore = all.length > paginated.length;
+
+  el.innerHTML = (paginated.length ? paginated.map(l => {
+    const isLot = l.listing_type === 'lot';
+    const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status==='expired'?'Istekao':'—';
+    const stColor = l.status==='active'?'ok':l.status==='finished'||l.status==='sent'?'ok':'wait';
+    return `<div class="admin-oglas-card" id="ac-l-${l.id}">
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer" onclick="admToggleOglas(${l.id})">
+        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'🪙')}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
+            ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${l.marka} ${l.model}${l.god?' ('+l.god+')':''}
+          </div>
           <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px">${stLabel}</span></div>
         </div>
         <span style="color:var(--muted);font-size:12px;flex-shrink:0">▼</span>
       </div>
-      <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2);font-size:12px;line-height:2.1">
-        ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>'\'' + x + '\'').join(',')}])">`).join('')}</div>` : ''; })()}
-        ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
-        <b>Stanje:</b> ${l.stanje||'—'}<br>
-        <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
-        ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${l.accepted_buyer_name} (${l.accepted_buyer_city||'—'})<br>` : ''}
-        ${l.nap?`<b>Napomena:</b> ${l.nap}<br>`:''}
-        <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}<br>
+      <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2)">
+        ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>`'${x}'`).join(',')}])">`).join('')}</div>` : ''; })()}
+        <div style="font-size:12px;line-height:2">
+          ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
+          ${!isLot?`<b>Stanje:</b> ${l.stanje||'—'}<br>`:''}
+          <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
+          ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${l.accepted_buyer_name} (${l.accepted_buyer_city||'—'})<br>` : ''}
+          ${l.sold_at ? `<b>Prodano:</b> ${new Date(l.sold_at).toLocaleDateString('bs')}<br>` : ''}
+          ${l.nap?`<b>Napomena:</b> ${l.nap}<br>`:''}
+          <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}
+        </div>
+        ${parseInt(l.ponuda_count) > 0 ? `
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Ponude</div>
+            <div id="adm-ponude-${l.id}"></div>
+          </div>` : ''}
         <div style="margin-top:10px">
           <button class="btn btn-or btn-xs" onclick="event.stopPropagation();admDeleteListing(${l.id})">🗑 Briši oglas</button>
         </div>
       </div>
     </div>`;
-  }).join(''):`<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
-}
-
-function admToggleOglas(id) {
-  const el = document.getElementById('adm-det-'+id);
-  if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`) +
+  (hasMore ? `<div style="text-align:center;margin:16px 0"><button class="btn btn-ghost" onclick="window._adminOglasiPage=(window._adminOglasiPage||0)+1;renderAdminOglasi()">Učitaj još (${all.length - paginated.length})</button></div>` : '');
 }
 
 
@@ -2744,10 +2805,9 @@ function openLotDetail(lid) {
     </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  // Back dugme zatvara lot modal
-  history.pushState({ lotModal: true }, '');
-  const _lotPop = () => { ov.remove(); window.removeEventListener('popstate', _lotPop); };
-  window.addEventListener('popstate', _lotPop);
+  // Registriraj za centralni back handler
+  ov.classList.add('ov', 'on');
+  history.pushState({}, '');
 }
 // ═══════════════════════════════════════════════════════
 async function checkBroadcasts() {
