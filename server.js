@@ -445,20 +445,37 @@ app.post('/api/listings', auth, async (req, res) => {
   try {
     if (req.user.role !== 'seller') return res.status(403).json({ error: 'Samo prodavci mogu objavljivati' });
 
-    const { broj, marka, model, god, stanje, nap, images } = req.body;
-    if (!marka) {
+    const { broj, marka, model, god, stanje, nap, images, listing_type, lot_items } = req.body;
+    const isLot = listing_type === 'lot';
+
+    if (!isLot && !marka) {
       return res.status(400).json({ error: 'Marka vozila je obavezna' });
+    }
+    if (isLot) {
+      const items = lot_items || [];
+      if (!items.length) return res.status(400).json({ error: 'Dodajte barem jedan katalizator u lot' });
+      if (items.length > 50) return res.status(400).json({ error: 'Maksimalno 50 komada po lotu' });
     }
 
     const result = await pool.query(
-      `INSERT INTO listings (user_id, broj, marka, model, god, stanje, nap, images, status, country)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)
+      `INSERT INTO listings (user_id, broj, marka, model, god, stanje, nap, images, status, country, listing_type, lot_items)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10, $11)
        RETURNING *`,
-      [req.user.id, broj||'', marka, model||'', god||'', stanje||'Nepoznato', nap||'',
-       JSON.stringify(images||[]), req.user.country || 'BA']
+      [
+        req.user.id,
+        isLot ? '' : (broj||''),
+        isLot ? 'Lot' : marka,
+        isLot ? '' : (model||''),
+        isLot ? '' : (god||''),
+        isLot ? '' : (stanje||'Nepoznato'),
+        nap||'',
+        JSON.stringify(images||[]),
+        req.user.country || 'BA',
+        isLot ? 'lot' : 'single',
+        JSON.stringify(isLot ? (lot_items||[]) : [])
+      ]
     );
 
-        // Invalidate listings cache
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -1206,6 +1223,9 @@ app.get('*', (req, res) => {
         UNIQUE(broadcast_id, user_id)
       )
     `);
+
+    await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS listing_type VARCHAR(10) DEFAULT 'single'`);
+    await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS lot_items JSONB DEFAULT '[]'`);
 
     console.log('✅ DB migration OK');
   } catch(e) { console.error('Migration error:', e.message); }
