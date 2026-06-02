@@ -2693,13 +2693,21 @@ function _pickStar(n) {
 
 async function _submitRating(toUserId, listingId) {
   if (!_selectedStars) return;
+  const stars = _selectedStars;
   const btn = document.getElementById('rating-submit-btn');
   try {
     if (btn) { btn.disabled = true; btn.textContent = 'Šaljem...'; }
-    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars: _selectedStars });
+    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars });
     document.getElementById('ov-rating')?.remove();
     _selectedStars = 0;
     toast('✅ Ocjena poslana!', 'ok');
+    // Odmah ažuriraj dugme na stranici ispod
+    const rateBtn = document.getElementById('rate-btn-' + listingId);
+    if (rateBtn) {
+      rateBtn.disabled = true;
+      rateBtn.textContent = '⭐ Ocijenjeno ' + '★'.repeat(stars) + '☆'.repeat(5 - stars);
+      rateBtn.style.opacity = '.5';
+    }
   } catch(err) {
     toast('❌ ' + err.message, 'err');
     if (btn) { btn.disabled = false; btn.textContent = 'Ocijeni'; }
