@@ -984,7 +984,7 @@ app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
 // UPLOAD ROUTE
 // ═══════════════════════════════════════════════════════════
 app.post('/api/upload', auth, (req, res, next) => {
-  upload.array('images', 10)(req, res, err => {
+  upload.array('images', 50)(req, res, err => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Slika je prevelika (max 5MB po slici)' });
