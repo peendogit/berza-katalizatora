@@ -1100,13 +1100,17 @@ app.post('/api/admin/broadcast', auth, adminOnly, async (req, res) => {
 // GET /api/broadcasts/unread  — nepročitani broadcastovi za CU
 app.get('/api/broadcasts/unread', auth, async (req, res) => {
   try {
+    // Fetchaj datum registracije korisnika
+    const userRes = await pool.query('SELECT created_at FROM users WHERE id = $1', [req.user.id]);
+    const userCreatedAt = userRes.rows[0] ? userRes.rows[0].created_at : new Date();
     const result = await pool.query(`
       SELECT b.* FROM broadcasts b
       LEFT JOIN broadcast_reads br ON br.broadcast_id = b.id AND br.user_id = $1
       WHERE br.id IS NULL
+        AND b.created_at > $2
       ORDER BY b.created_at DESC
       LIMIT 10
-    `, [req.user.id]);
+    `, [req.user.id, userCreatedAt]);
     res.json(result.rows);
   } catch(err) {
     res.status(500).json({ error: 'Greška' });
