@@ -1324,8 +1324,7 @@ function openLightbox(src, gallery) {
   if (_lbIdx < 0) _lbIdx = 0;
   _lbRender();
   document.getElementById('lightbox').classList.add('on');
-  // Dodaj history entry da back dugme zatvori lightbox
-  history.pushState({ lightbox: true }, '');
+  _pushBack(() => closeLightbox());
 }
 
 function closeLightbox() {
@@ -1335,9 +1334,6 @@ function closeLightbox() {
   _lbGallery = []; _lbIdx = 0; _lbScale = 1;
   const img = document.getElementById('lightbox-img');
   if (img) { img.classList.remove('zoomed'); img.style.transform = 'scale(1)'; }
-  if (history.state && history.state.lightbox) {
-    history.replaceState(null, '');
-  }
 }
 
 let _lbScale = 1;
@@ -1376,16 +1372,6 @@ function _lbRender() {
 // Zatvori klik na pozadinu
 document.addEventListener('click', e => {
   if (e.target.id === 'lightbox') closeLightbox();
-});
-// Back dugme zatvara lightbox bez navigacije
-window.addEventListener('popstate', e => {
-  const lb = document.getElementById('lightbox');
-  if (lb && lb.classList.contains('on')) {
-    lb.classList.remove('on');
-    _lbGallery = []; _lbIdx = 0;
-    // Pushaj novi state da back ne odvede s aplikacije
-    history.pushState(null, '');
-  }
 });
 // Strelice na tastaturi
 document.addEventListener('keydown', e => {
@@ -2628,36 +2614,42 @@ function onCountryChange(countrySelectId, inputId) {
 // Nema JS listenera koji bi interferirao s dugmadima
 
 // ═══════════════════════════════════════════════════════
-// BACK BUTTON (Android/browser history)
+// CENTRALNI BACK BUTTON SISTEM
 // ═══════════════════════════════════════════════════════
-let navStack = []; // stack stranica/tabova
+// Stack funkcija za zatvaranje (LIFO). Svaki modal/overlay registrira svoju close funkciju.
+const _backStack = [];
 
-function pushNav(state) {
-  history.pushState(state, '');
-  navStack.push(state);
+function _pushBack(closeFn) {
+  _backStack.push(closeFn);
+  history.pushState({ backStack: _backStack.length }, '');
+}
+
+function _popBack() {
+  const fn = _backStack.pop();
+  if (fn) fn();
 }
 
 window.addEventListener('popstate', e => {
-  // Prvo zatvori bilo koji otvoreni overlay
-  const overlays = document.querySelectorAll('.ov.on');
-  if (overlays.length) {
-    overlays.forEach(o => o.classList.remove('on'));
-    history.pushState({}, ''); // vrati state da ne izađe iz app
+  if (_backStack.length > 0) {
+    _popBack();
+    history.pushState({ backStack: _backStack.length }, '');
     return;
   }
-  // Inače idi korak unazad u navStacku
-  if (navStack.length > 1) {
-    navStack.pop();
-    const prev = navStack[navStack.length - 1];
-    if (prev) restoreNav(prev);
-  } else {
-    // Na početku — idi na hero/home
-    if (CU) {
-      history.pushState({}, '');
-    }
-    // Ako nema CU, pusti da izađe normalno
+  // Fallback — zatvori bilo koji otvoreni .ov overlay
+  const overlays = [...document.querySelectorAll('.ov.on')];
+  if (overlays.length) {
+    overlays.forEach(o => o.classList.remove('on'));
+    history.pushState({ backStack: 0 }, '');
+    return;
+  }
+  // Nema otvorenih modalova — ostani u app
+  if (CU) {
+    history.pushState({ backStack: 0 }, '');
   }
 });
+
+// Init state pri učitavanju
+history.replaceState({ backStack: 0 }, '');
 
 function restoreNav(state) {
   if (!state) return;
@@ -2804,10 +2796,8 @@ function openLotDetail(lid) {
       </div>
     </div>`;
   document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  // Registriraj za centralni back handler
-  ov.classList.add('ov', 'on');
-  history.pushState({}, '');
+  ov.addEventListener('click', e => { if(e.target===ov) { ov.remove(); } });
+  _pushBack(() => ov.remove());
 }
 // ═══════════════════════════════════════════════════════
 async function checkBroadcasts() {
@@ -2896,6 +2886,7 @@ function openRatingModal(toUserId, listingId, listingName) {
     </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  _pushBack(() => ov.remove());
 }
 
 const _starLabels = ['','😕 Loše','😐 Ispod prosjeka','🙂 Solidno','😊 Dobro','🤩 Odlično'];
@@ -2985,6 +2976,7 @@ async function openUserProfile(userId, userName) {
     ov.remove();
   });
   ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  _pushBack(() => ov.remove());
 
   try {
     const data = await api('GET', '/ratings/' + userId);
