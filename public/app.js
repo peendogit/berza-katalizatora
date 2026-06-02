@@ -153,6 +153,15 @@ async function api(method, path, body) {
     throw new Error('Server greška (' + res.status + ')');
   }
   const data = await res.json();
+  if (res.status === 401) {
+    // Sesija istekla ili novi login na drugom uređaju
+    const msg = data.error || 'Sesija istekla';
+    localStorage.removeItem('token');
+    CU = null;
+    showPage('page-hero');
+    toast('⚠️ ' + msg, 'err');
+    throw new Error(msg);
+  }
   if (!res.ok) throw new Error(data.error || 'Greška');
   return data;
 }
@@ -777,15 +786,30 @@ function toggleZav(lid) {
 async function togglePoslato(lid, checked) {
   try {
     await api('PUT', '/listings/'+lid+'/status', { status: checked ? 'sent' : 'finished' });
-    if (checked) poslatoSet.add(lid);
-    else poslatoSet.delete(lid);
+    if (checked) poslatoSet.add(lid); else poslatoSet.delete(lid);
     invalidateListingsCache();
-    renderZavrseni();
-  } catch(err) { 
-    // Vrati checkbox na staro stanje ako API fail
+    // Samo ažuriraj vizual te kartice, ne rerenderuj sve
+    const card = document.getElementById('zav-'+lid);
+    if (card) {
+      if (checked) {
+        card.classList.add('poslato');
+        // Sakrij addr blok, ostavi ocijeni kupca vidljivo
+        const addrBox = card.querySelector('.zav-addr-box');
+        if (addrBox) addrBox.style.display = 'none';
+        const badge = card.querySelector('.badge');
+        if (badge) { badge.textContent = '✅ Poslato'; badge.className = 'badge b-ok'; badge.style.flexShrink='0'; }
+      } else {
+        card.classList.remove('poslato');
+        const addrBox = card.querySelector('.zav-addr-box');
+        if (addrBox) addrBox.style.display = '';
+        const badge = card.querySelector('.badge');
+        if (badge) { badge.textContent = '📦 Za slanje'; badge.className = 'badge b-wait'; badge.style.flexShrink='0'; }
+      }
+    }
+  } catch(err) {
     const chk = document.getElementById('chk-'+lid);
     if (chk) chk.checked = !checked;
-    toast('❌ ' + err.message, 'err'); 
+    toast('❌ ' + err.message, 'err');
   }
 }
 
