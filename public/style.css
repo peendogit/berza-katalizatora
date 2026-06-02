@@ -30,6 +30,11 @@
 [data-theme="light"] .pay-box { background:linear-gradient(135deg,#eef6ff,#f0fff4); }
 [data-theme="light"] .pending-wall { background:linear-gradient(135deg,#fffbe6,#f0fff4); }
 
+/* Dark tema - muted slova bilja u čitljivija */
+:root .oglas-nap, :root .oglas-seller, :root .s-oglas-meta,
+:root .ponuda-row [style*="color:var(--muted)"],
+:root [style*="color:var(--muted2)"] { color:#b0b0ba !important; }
+
 /* THEME TOGGLE */
 .theme-btn { background:none; border:1.5px solid var(--border2); border-radius:20px; padding:4px 10px; font-size:16px; cursor:pointer; transition:all .2s; color:var(--text); line-height:1; }
 .theme-btn:hover { border-color:var(--orange); transform:scale(1.1); }
@@ -86,11 +91,20 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);z-index:200;align-items:flex-end;justify-content:center;}
 .ov.on{display:flex;}
 .ov-center{align-items:center;padding:16px;}
+/* Mobile: profil modal ide na vrh */
+@media (max-width:600px) {
+  .ov-top { align-items:flex-start !important; padding-top:60px !important; }
+}
 .sheet{background:var(--panel);border:1px solid var(--border2);border-radius:14px 14px 0 0;width:100%;max-width:500px;padding:24px 20px;position:relative;animation:slideUp .22s ease;max-height:92vh;overflow-y:auto;}
 .sheet-center{border-radius:14px;max-height:88vh;}
 .sheet-close{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background .15s;}
 .sheet-close:hover{background:rgba(255,255,255,.08);color:var(--text);}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* Lightbox zoom na desktopu */
+#lightbox-img { cursor:zoom-in; transition:transform .2s ease; }
+#lightbox-img.zoomed { cursor:zoom-out; transform:scale(1.9); transform-origin:center center; }
+@media (max-width:600px) { #lightbox-img.zoomed { transform:scale(1.4); } }
 
 /* ROLE CARDS */
 .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}

@@ -673,11 +673,17 @@ async function renderZavrseni() {
   merged.forEach(l => { if (l.status === 'sent') poslatoSet.add(l.id); });
   // Fetchaj koje transakcije su već ocijenjene
   let ratedSet = new Set();
+  let ratingMap = {};
   try {
     const ratingChecks = await Promise.all(
       merged.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
     );
-    merged.forEach((l, i) => { if (ratingChecks[i].rated) ratedSet.add(l.id); });
+    merged.forEach((l, i) => {
+      if (ratingChecks[i].rated) {
+        ratedSet.add(l.id);
+        ratingMap[l.id] = ratingChecks[i].rating;
+      }
+    });
   } catch(e) {}
 
   // Sortiraj: najnoviji na vrhu, poslato na dno
@@ -725,7 +731,7 @@ async function renderZavrseni() {
           </div>
           ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <span>Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></span>
-            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?'disabled style="opacity:.5"':''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id)?'⭐ Ocijenjeno':'⭐ Ocijeni kupca'}</button>` : ''}
+            ${acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : ''}
           </div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
       </div>
@@ -957,11 +963,17 @@ async function renderBuyerZavrseni() {
 
   // Provjeri koje su već ocijenjene
   let buyerRatedSet = new Set();
+  let buyerRatingMap = {};
   try {
     const checks = await Promise.all(
       sortedFinished.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
     );
-    sortedFinished.forEach((l, i) => { if (checks[i].rated) buyerRatedSet.add(l.id); });
+    sortedFinished.forEach((l, i) => {
+      if (checks[i].rated) {
+        buyerRatedSet.add(l.id);
+        buyerRatingMap[l.id] = checks[i].rating;
+      }
+    });
   } catch(e) {}
 
   el.innerHTML = sortedFinished.map(l => {
@@ -990,7 +1002,7 @@ async function renderBuyerZavrseni() {
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
-        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?'disabled style="opacity:.5"':''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">${buyerRatedSet.has(l.id)?'⭐ Ocijenjeno':'⭐ Ocijeni prodavača'}</button>
+        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">${buyerRatedSet.has(l.id) ? '⭐ Ocijenjeno ' + (buyerRatingMap[l.id] ? '★'.repeat(buyerRatingMap[l.id].stars)+'☆'.repeat(5-buyerRatingMap[l.id].stars) : '') : '⭐ Ocijeni prodavača'}</button>
       </div>
     </div>`;
   }).join('');
@@ -1265,12 +1277,17 @@ function closeLightbox() {
   if (!lb || !lb.classList.contains('on')) return;
   lb.classList.remove('on');
   _lbGallery = []; _lbIdx = 0;
-  // Ukloni history entry od lightboxa
-  if (history.state && history.state.lightbox) history.back();
+  const img = document.getElementById('lightbox-img');
+  if (img) img.classList.remove('zoomed');
+  if (history.state && history.state.lightbox) {
+    history.replaceState(null, '');
+  }
 }
 
 function lbNav(dir) {
   _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
+  const img = document.getElementById('lightbox-img');
+  if (img) img.classList.remove('zoomed');
   _lbRender();
 }
 
@@ -1285,17 +1302,21 @@ function _lbRender() {
   if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx+1) + ' / ' + _lbGallery.length; }
 }
 
-// Zatvori klik na pozadinu
+// Zoom na klik slike u lightboxu (desktop)
 document.addEventListener('click', e => {
-  if (e.target.id === 'lightbox') closeLightbox();
+  if (e.target.id === 'lightbox') { closeLightbox(); return; }
+  if (e.target.id === 'lightbox-img') {
+    e.target.classList.toggle('zoomed');
+  }
 });
-// Back dugme zatvara lightbox
+// Back dugme zatvara lightbox bez navigacije
 window.addEventListener('popstate', e => {
   const lb = document.getElementById('lightbox');
   if (lb && lb.classList.contains('on')) {
     lb.classList.remove('on');
     _lbGallery = []; _lbIdx = 0;
-    // Ne pozivaj closeLightbox() da izbjegnemo rekurziju
+    // Pushaj novi state da back ne odvede s aplikacije
+    history.pushState(null, '');
   }
 });
 // Strelice na tastaturi
@@ -2678,7 +2699,13 @@ async function checkAndRate(toUserId, listingId, listingName, btn) {
   try {
     const res = await api('GET', '/ratings/check/' + listingId);
     if (res.rated) {
-      if (btn) { btn.disabled = true; btn.textContent = `⭐ Ocijenjeno (${res.rating.stars}★)`; btn.style.opacity = '.5'; }
+      if (btn) {
+        const stars = res.rating ? res.rating.stars : 0;
+        const starsStr = stars ? ' ' + '★'.repeat(stars) + '☆'.repeat(5-stars) : '';
+        btn.disabled = true;
+        btn.textContent = `⭐ Ocijenjeno${starsStr}`;
+        btn.style.opacity = '.5';
+      }
       toast('Već ste ocijenili ovu transakciju.', '');
       return;
     }
@@ -2691,9 +2718,10 @@ async function checkAndRate(toUserId, listingId, listingName, btn) {
 async function openUserProfile(userId, userName) {
   const existing = document.getElementById('ov-user-profile');
   if (existing) existing.remove();
+  const isMobile = window.innerWidth <= 600;
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
-  ov.className = 'ov ov-center on';
+  ov.className = 'ov ' + (isMobile ? 'ov-top' : 'ov-center') + ' on';
   ov.style.cssText = 'z-index:10001';
   ov.innerHTML = `
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:100%;max-width:360px;animation:slideUp .22s ease" onclick="event.stopPropagation()">
@@ -2704,7 +2732,11 @@ async function openUserProfile(userId, userName) {
       <div id="user-profile-body" style="color:#aaa;font-size:13px;text-align:center;padding:16px">Učitavam...</div>
     </div>`;
   document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  // Capture phase blokira klik od propagacije do elemenata ispod (ponude panel)
+  ov.addEventListener('click', e => {
+    e.stopPropagation();
+    if(e.target===ov) ov.remove();
+  }, true);
 
   try {
     const data = await api('GET', '/ratings/' + userId);
