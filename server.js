@@ -313,6 +313,7 @@ app.get('/api/listings', auth, async (req, res) => {
       query = `
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
                l.images, l.status, l.country, l.created_at,
+               l.listing_type, l.lot_items,
                u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count,
                (SELECT COUNT(*) FROM listings ls WHERE ls.user_id = l.user_id AND ls.status IN ('finished','sent')) as sales_count,
@@ -323,7 +324,8 @@ app.get('/api/listings', auth, async (req, res) => {
         LEFT JOIN ponude p ON p.listing_id = l.id
         WHERE l.status = 'active' AND l.country = $1
         GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
-                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
+                 l.images, l.status, l.country, l.created_at, l.listing_type, l.lot_items,
+                 u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [req.user.country || 'BA'];
     }
