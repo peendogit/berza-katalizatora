@@ -553,6 +553,8 @@ async function reactivateListing(lid) {
 }
 
 async function togglePP(lid) {
+  // Ne reaguj ako je profil modal otvoren
+  if (document.getElementById('ov-user-profile')) return;
   const panel = document.getElementById('pp-'+lid);
   if (!panel) return;
   if (panel.style.display==='block') { panel.style.display='none'; return; }
@@ -1276,18 +1278,33 @@ function closeLightbox() {
   const lb = document.getElementById('lightbox');
   if (!lb || !lb.classList.contains('on')) return;
   lb.classList.remove('on');
-  _lbGallery = []; _lbIdx = 0;
+  _lbGallery = []; _lbIdx = 0; _lbScale = 1;
   const img = document.getElementById('lightbox-img');
-  if (img) img.classList.remove('zoomed');
+  if (img) { img.classList.remove('zoomed'); img.style.transform = 'scale(1)'; }
   if (history.state && history.state.lightbox) {
     history.replaceState(null, '');
   }
 }
 
+let _lbScale = 1;
+
+function lbZoom(dir) {
+  _lbScale = Math.min(4, Math.max(0.5, _lbScale + dir * 0.5));
+  const img = document.getElementById('lightbox-img');
+  if (img) img.style.transform = `scale(${_lbScale})`;
+}
+
+function lbZoomReset() {
+  _lbScale = 1;
+  const img = document.getElementById('lightbox-img');
+  if (img) img.style.transform = 'scale(1)';
+}
+
 function lbNav(dir) {
   _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
+  _lbScale = 1;
   const img = document.getElementById('lightbox-img');
-  if (img) img.classList.remove('zoomed');
+  if (img) { img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
   _lbRender();
 }
 
@@ -1302,12 +1319,9 @@ function _lbRender() {
   if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx+1) + ' / ' + _lbGallery.length; }
 }
 
-// Zoom na klik slike u lightboxu (desktop)
+// Zatvori klik na pozadinu
 document.addEventListener('click', e => {
-  if (e.target.id === 'lightbox') { closeLightbox(); return; }
-  if (e.target.id === 'lightbox-img') {
-    e.target.classList.toggle('zoomed');
-  }
+  if (e.target.id === 'lightbox') closeLightbox();
 });
 // Back dugme zatvara lightbox bez navigacije
 window.addEventListener('popstate', e => {
@@ -2718,25 +2732,25 @@ async function checkAndRate(toUserId, listingId, listingName, btn) {
 async function openUserProfile(userId, userName) {
   const existing = document.getElementById('ov-user-profile');
   if (existing) existing.remove();
-  const isMobile = window.innerWidth <= 600;
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
-  ov.className = 'ov ' + (isMobile ? 'ov-top' : 'ov-center') + ' on';
-  ov.style.cssText = 'z-index:10001';
+  // Uvijek centar, ali na mobilnom scroll na vrh
+  ov.className = 'ov ov-center on';
+  ov.style.cssText = 'z-index:10001;align-items:flex-start;padding-top:80px;';
   ov.innerHTML = `
-    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:100%;max-width:360px;animation:slideUp .22s ease" onclick="event.stopPropagation()">
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#fff">👤 ${userName}</div>
-        <button onclick="document.getElementById('ov-user-profile').remove()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer">✕</button>
+        <button id="ov-user-profile-close" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1;padding:4px 8px">✕</button>
       </div>
       <div id="user-profile-body" style="color:#aaa;font-size:13px;text-align:center;padding:16px">Učitavam...</div>
     </div>`;
   document.body.appendChild(ov);
-  // Capture phase blokira klik od propagacije do elemenata ispod (ponude panel)
-  ov.addEventListener('click', e => {
+  document.getElementById('ov-user-profile-close').addEventListener('click', e => {
     e.stopPropagation();
-    if(e.target===ov) ov.remove();
-  }, true);
+    ov.remove();
+  });
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
 
   try {
     const data = await api('GET', '/ratings/' + userId);

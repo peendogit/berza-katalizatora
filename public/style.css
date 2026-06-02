@@ -30,11 +30,6 @@
 [data-theme="light"] .pay-box { background:linear-gradient(135deg,#eef6ff,#f0fff4); }
 [data-theme="light"] .pending-wall { background:linear-gradient(135deg,#fffbe6,#f0fff4); }
 
-/* Dark tema - muted slova bilja u čitljivija */
-:root .oglas-nap, :root .oglas-seller, :root .s-oglas-meta,
-:root .ponuda-row [style*="color:var(--muted)"],
-:root [style*="color:var(--muted2)"] { color:#b0b0ba !important; }
-
 /* THEME TOGGLE */
 .theme-btn { background:none; border:1.5px solid var(--border2); border-radius:20px; padding:4px 10px; font-size:16px; cursor:pointer; transition:all .2s; color:var(--text); line-height:1; }
 .theme-btn:hover { border-color:var(--orange); transform:scale(1.1); }
@@ -471,7 +466,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
   to   { transform: translateY(0);     opacity: 1; }
 }
 
-/* Toggle switch za email notifikacije */
-#p-email-notify + span span {
-  transition: left .3s;
+/* Lightbox zoom dugmad - samo desktop */
+@media (max-width: 600px) {
+  #lb-zoom-btns { display: none !important; }
 }
