@@ -2707,9 +2707,9 @@ function openLotDetail(lid) {
         : it.stanje === 'Zapušen / pokvaren'
           ? `<span style="color:var(--red);font-size:11px">❌ Zapušen</span>`
           : `<span style="color:var(--muted);font-size:11px">— Nepoznato</span>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <span style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${i+1}</span>
-      <span style="flex:1;font-size:13px;color:${it.broj?'var(--text)':'var(--muted)'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400}">${it.broj || '— bez OEM broja'}</span>
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+      <span style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;flex-shrink:0">${i+1}</span>
+      <span style="flex:1;font-size:14px;color:${it.broj?'#fff':'#666'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400};letter-spacing:.3px">${it.broj || '— bez OEM broja'}</span>
       ${stBadge}
     </div>`;
   }).join('');
