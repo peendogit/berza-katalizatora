@@ -2521,7 +2521,6 @@ function aTabSilent(n) {
   if (n==='users')  renderAdminUsers();
   if (n==='oglasi') renderAdminOglasi();
   if (n==='analitika') renderAnalitika();
-  if (n==='analitika') renderAnalitika();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2539,7 +2538,7 @@ function sortListings(listings) {
   if (currentSort === 'novo') {
     return copy.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
   } else if (currentSort === 'ponude') {
-    return copy.sort((a,b) => b.ponude.length - a.ponude.length);
+    return copy.sort((a,b) => (parseInt(b.ponuda_count)||0) - (parseInt(a.ponuda_count)||0));
   } else if (currentSort === 'istice') {
     return copy.sort((a,b) => {
       const remA = 7 - Math.floor((Date.now()-(a.createdAt||0))/86400000);
@@ -2735,13 +2734,13 @@ async function openUserProfile(userId, userName) {
   if (existing) existing.remove();
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
-  ov.className = 'ov on';
+  // Ne koristimo .ov klasu - sve inline da izbjegnemo CSS konflikte
   ov.style.cssText = [
-    'position:fixed', 'inset:0', 'z-index:10001',
-    'background:rgba(0,0,0,.82)', 'backdrop-filter:blur(4px)',
-    'display:flex', 'flex-direction:column',
-    'align-items:center', 'justify-content:flex-start',
-    'padding-top:72px', 'overflow-y:auto'
+    'position:fixed', 'top:0', 'left:0', 'right:0', 'bottom:0',
+    'z-index:10001', 'background:rgba(0,0,0,.82)', 'backdrop-filter:blur(4px)',
+    'display:flex', 'flex-direction:column', 'align-items:center',
+    'justify-content:flex-start', 'padding-top:64px',
+    'overflow-y:auto', 'overscroll-behavior:contain'
   ].join(';') + ';';
   ov.innerHTML = `
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
