@@ -392,9 +392,15 @@ function rmFile(i) {
 // SUBMIT LISTING
 // ═══════════════════════════════════════════════════════
 async function submitListing() {
-  const marka = document.getElementById('f-marka').value.trim();
-  if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+  const isLot = _listingType === 'lot';
   const btn = document.getElementById('btn-submit-oglas');
+  if (!isLot) {
+    const marka = document.getElementById('f-marka').value.trim();
+    if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+  } else {
+    const items = getLotItems();
+    if (!items.length) { toast('Dodajte barem jedan katalizator u lot', 'err'); return; }
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
   const _reEnableBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; } };
   try {
@@ -411,27 +417,33 @@ async function submitListing() {
       const upData = await upRes.json();
       if (upData.urls) imageUrls = upData.urls;
     }
-    await api('POST', '/listings', {
+    const payload = isLot ? {
+      listing_type: 'lot',
+      lot_items: getLotItems(),
+      nap: document.getElementById('f-nap').value.trim(),
+      images: imageUrls
+    } : {
+      listing_type: 'single',
       broj:   document.getElementById('f-broj').value.trim(),
-      marka,
+      marka:  document.getElementById('f-marka').value.trim(),
       model:  document.getElementById('f-model').value.trim(),
       god:    document.getElementById('f-god').value.trim(),
       stanje: document.getElementById('f-stanje').value,
       nap:    document.getElementById('f-nap').value.trim(),
       images: imageUrls
-    });
+    };
+    await api('POST', '/listings', payload);
     uploads = [];
     document.getElementById('prev-grid').innerHTML = '';
-    ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
+    ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
     _reEnableBtn();
     closeOv('ov-novi');
-    toast('✅ Oglas objavljen!', 'ok');
+    toast(isLot ? `✅ Lot objavljen!` : '✅ Oglas objavljen!', 'ok');
     invalidateListingsCache();
     sTab('oglasi');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
-  } finally {
-    const btn = document.getElementById('novi-submit-btn');
+    _reEnableBtn();
   }
 }
 
@@ -498,7 +510,11 @@ async function renderMyListings() {
       <div class="s-oglas-body">
         <div class="s-oglas-thumb">${thumb}</div>
         <div style="flex:1">
-          <div class="s-oglas-title">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div class="s-oglas-title">${
+            l.listing_type === 'lot'
+              ? `<span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:4px">LOT</span>📦 ${Array.isArray(l.lot_items)?l.lot_items.length:0} katalizatora`
+              : `${l.marka} ${l.model}${l.god?' ('+l.god+')':''}`
+          }</div>
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
             📅 ${fmtDate(l.createdAt)}
@@ -824,22 +840,31 @@ async function renderBuyerListings() {
   const moze = canBid();
   el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
+    const isLot = l.listing_type === 'lot';
+    const lotItems = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
+    const lotCount = lotItems.length;
+    const lotPreview = lotItems.slice(0,3).map(i=>i.broj).filter(Boolean).join(', ') + (lotItems.length > 3 ? '...' : '');
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'🔧'}</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
     const ponudaBtn = moze
-      ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Ponuda</button>`
+      ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : l.marka+' '+l.model}')">` + oglasBtnLabel + `</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
     return `<div class="oglas-card">
       ${thumb}
       <div class="oglas-body">
-        <div class="oglas-title">${l.marka} ${l.model}${l.god ? ' (' + l.god + ')' : ''}</div>
+        ${isLot
+          ? `<div class="oglas-title"><span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-right:5px;vertical-align:middle">LOT</span>📦 ${lotCount} katalizatora</div>`
+          : `<div class="oglas-title">${l.marka} ${l.model}${l.god ? ' (' + l.god + ')' : ''}</div>`
+        }
         <div class="oglas-badges">
-          ${l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
-          <span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>
+          ${!isLot && l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
+          ${!isLot ? `<span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>` : ''}
+          ${isLot && lotPreview ? `<span style="font-size:11px;color:var(--muted2)">OEM: ${lotPreview}</span>` : ''}
           ${expW}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
@@ -847,7 +872,7 @@ async function renderBuyerListings() {
         <div class="oglas-footer">
           <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
           <div class="oglas-actions">
-            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
+            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${isLot?'Lot '+lotCount+' kom':l.marka+' '+l.model}')">💬 Poruka</button>
             ${ponudaBtn}
           </div>
         </div>
@@ -2014,9 +2039,78 @@ function admToggleOglas(id) {
 // ═══════════════════════════════════════════════════════
 // NOVI OGLAS (FAB)
 // ═══════════════════════════════════════════════════════
+let _listingType = 'single';
+let _lotRowCount = 0;
+
+function setListingType(type) {
+  _listingType = type;
+  document.getElementById('form-single').style.display = type === 'single' ? '' : 'none';
+  document.getElementById('form-lot').style.display = type === 'lot' ? '' : 'none';
+  document.getElementById('tog-single').className = 'btn btn-sm ' + (type === 'single' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('tog-lot').className = 'btn btn-sm ' + (type === 'lot' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('tog-single').style.flex = '1';
+  document.getElementById('tog-lot').style.flex = '1';
+  if (type === 'lot' && _lotRowCount === 0) {
+    addLotRow(); addLotRow(); addLotRow(); // Start sa 3 reda
+  }
+}
+
+function addLotRow() {
+  const container = document.getElementById('lot-rows');
+  if (!container) return;
+  const count = container.querySelectorAll('.lot-row').length;
+  if (count >= 50) { toast('Maksimalno 50 komada', 'err'); return; }
+  _lotRowCount++;
+  const id = _lotRowCount;
+  const row = document.createElement('div');
+  row.className = 'lot-row';
+  row.id = 'lot-row-' + id;
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  row.innerHTML = `
+    <div style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${count+1}</div>
+    <input placeholder="OEM broj (opcija)" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
+    <select style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 8px;font-family:Barlow,sans-serif;font-size:12px;flex-shrink:0" class="lot-stanje">
+      <option value="Originalni — neoštećen">Originalni</option>
+      <option value="Malo oštećen">Malo oštećen</option>
+      <option value="Zapušen / pokvaren">Zapušen</option>
+      <option value="Nepoznato" selected>Nepoznato</option>
+    </select>
+    <button onclick="removeLotRow('lot-row-${id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;padding:2px 4px">×</button>`;
+  container.appendChild(row);
+  updateLotCount();
+}
+
+function removeLotRow(rowId) {
+  const row = document.getElementById(rowId);
+  if (row) row.remove();
+  // Renumber
+  document.querySelectorAll('.lot-row').forEach((r, i) => {
+    const num = r.querySelector('div');
+    if (num) num.textContent = i + 1;
+  });
+  updateLotCount();
+}
+
+function updateLotCount() {
+  const count = document.querySelectorAll('.lot-row').length;
+  const info = document.getElementById('lot-count-info');
+  if (info) info.textContent = count > 0 ? `${count} katalizatora u lotu` + (count >= 40 ? ` — max 50` : '') : '';
+}
+
+function getLotItems() {
+  const items = [];
+  document.querySelectorAll('.lot-row').forEach(row => {
+    const broj = row.querySelector('.lot-broj')?.value.trim() || '';
+    const stanje = row.querySelector('.lot-stanje')?.value || 'Nepoznato';
+    items.push({ broj, stanje });
+  });
+  return items;
+}
+
 function openNoviOglas() {
-  // Resetuj formu i slike
   uploads = [];
+  _listingType = 'single';
+  _lotRowCount = 0;
   const pg = document.getElementById('prev-grid');
   if (pg) pg.innerHTML = '';
   ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => {
@@ -2024,6 +2118,15 @@ function openNoviOglas() {
   });
   const fs = document.getElementById('f-stanje');
   if (fs) fs.selectedIndex = 0;
+  // Reset lot
+  const lotRows = document.getElementById('lot-rows');
+  if (lotRows) lotRows.innerHTML = '';
+  document.getElementById('form-single').style.display = '';
+  document.getElementById('form-lot').style.display = 'none';
+  document.getElementById('tog-single').className = 'btn btn-primary btn-sm';
+  document.getElementById('tog-lot').className = 'btn btn-ghost btn-sm';
+  document.getElementById('tog-single').style.flex = '1';
+  document.getElementById('tog-lot').style.flex = '1';
   document.getElementById('ov-novi').classList.add('on');
 }
 
