@@ -182,8 +182,10 @@ async function doRegister() {
   const tel   = document.getElementById('reg-tel').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
   const pass  = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
   if (!name||!city||!tel||!email||!pass) { toast('Popunite sva obavezna polja', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
+  if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
@@ -2734,7 +2736,13 @@ async function openUserProfile(userId, userName) {
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
   ov.className = 'ov on';
-  ov.style.cssText = 'z-index:10001;display:flex;align-items:flex-start;justify-content:center;padding-top:72px;overflow-y:auto;';
+  ov.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:10001',
+    'background:rgba(0,0,0,.82)', 'backdrop-filter:blur(4px)',
+    'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:flex-start',
+    'padding-top:72px', 'overflow-y:auto'
+  ].join(';') + ';';
   ov.innerHTML = `
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
