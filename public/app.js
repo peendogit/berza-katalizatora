@@ -477,9 +477,7 @@ async function renderMyListings() {
   try {
     const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(),
-      ponude: [],
+      ...parseListing(l),
       _ponuda_count: parseInt(l.ponuda_count)||0
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
@@ -673,10 +671,7 @@ async function renderZavrseni() {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await cachedListings();
-    LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(), ponude: []
-    }));
+    LISTINGS = data.map(parseListing);
   } catch(e) { el.innerHTML = '<div class="empty"><p>Greška pri učitavanju.</p></div>'; return; }
   const mine = LISTINGS.filter(l => l.uid === CU.id && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
   if (!mine.length) {
@@ -784,6 +779,18 @@ async function togglePoslato(lid, checked) {
 }
 
 
+function parseListing(l) {
+  return {
+    ...l,
+    uid: l.user_id,
+    thumb: l.images && l.images.length ? l.images[0] : null,
+    createdAt: new Date(l.created_at).getTime(),
+    ponude: l.my_ponude || [],
+    lot_items: Array.isArray(l.lot_items) ? l.lot_items
+      : (typeof l.lot_items === 'string' && l.lot_items ? JSON.parse(l.lot_items) : [])
+  };
+}
+
 function renderBuyerPage() {
   const pend = CU.status==='pending';
   document.getElementById('buyer-pending').style.display  = pend?'':'none';
@@ -796,11 +803,7 @@ async function renderBuyerListings() {
   try {
     invalidateListingsCache();
     const data = await cachedListings();
-    LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(),
-      ponude: l.my_ponude || []
-    }));
+    LISTINGS = data.map(parseListing);
     // Sync my ponude
     allMyPonude[CU.id] = LISTINGS.flatMap(l =>
       (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime(), createdAt: p.created_at ? new Date(p.created_at).getTime() : 0 }))
@@ -975,10 +978,7 @@ async function renderBuyerZavrseni() {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await api('GET', '/listings'); // forsiraj svjež fetch
-    LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || []
-    }));
+    LISTINGS = data.map(parseListing);
   } catch(e) { el.innerHTML = '<div class="empty"><p>Greška.</p></div>'; return; }
 
   // Oglasi gdje je moja ponuda prihvaćena
@@ -2000,10 +2000,7 @@ async function renderAdminOglasi() {
   const el=document.getElementById('a-oglasi');
   try {
     const data = await cachedListings();
-    LISTINGS = data.map(l => ({
-      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
-      createdAt: new Date(l.created_at).getTime(), ponude: []
-    }));
+    LISTINGS = data.map(parseListing);
   } catch(e) { toast('Greška', 'err'); return; }
   el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
     const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status;
@@ -2144,7 +2141,7 @@ async function renderPoruke() {
   if (!LISTINGS.length) {
     try {
       const data = await cachedListings();
-      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: [] }));
+      LISTINGS = data.map(parseListing);
     } catch(e) {}
   }
   try {
@@ -2299,7 +2296,7 @@ async function renderBuyerPoruke() {
   if (!LISTINGS.length) {
     try {
       const data = await cachedListings();
-      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || [] }));
+      LISTINGS = data.map(parseListing);
     } catch(e) {}
   }
   // Učitaj inbox iz API-ja
