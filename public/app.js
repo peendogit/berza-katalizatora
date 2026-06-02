@@ -1595,16 +1595,15 @@ function adminCard(u) {
 
   }
   ddItems.push(`<div class="admin-dd-sep"></div>`);
-  const acts = ''; const verifyBtn = '';
-  return `<div class="admin-card" id="ac-${u.id}" onclick="toggleUserDetail('${u.id}')" style="cursor:pointer">
-    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-      <div class="admin-av" style="background:${col}">${initials(u.name)}</div>
-      <div style="min-width:0">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${vB} ${pB}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
+  return `<div class="admin-card" id="ac-${u.id}" onclick="toggleUserDetail('${u.id}')" style="cursor:pointer;padding:8px 10px">
+    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+      <div class="admin-av" style="background:${col};width:32px;height:32px;font-size:12px;flex-shrink:0">${initials(u.name)}</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${pB}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email} · ${u.city||'—'} · ${u.tel||'—'}</div>
       </div>
     </div>
-    <div style="flex-shrink:0">
+    <div style="flex-shrink:0;margin-left:6px">
       <div class="admin-dd" id="add-${u.id}" onclick="event.stopPropagation()">
         <button class="admin-dd-btn" onclick="toggleAdminDD('${u.id}')">Akcije ▾</button>
         <div class="admin-dd-menu">${ddItems.join('')}</div>
@@ -1913,8 +1912,8 @@ async function renderAnalitika() {
     const baActive  = activeLi.filter(l => l.country === 'BA');
     const rsActive  = activeLi.filter(l => l.country === 'RS');
 
-    el.innerHTML = `<div style="max-width:520px;margin:0 auto">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    el.innerHTML = `<div style="max-width:760px;margin:0 auto">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
         ${statBox('Prodavači', sellers.length, 'var(--orange)')}
         ${statBox('Otkupljivači', buyers.length, 'var(--red)')}
         ${statBox('Na čekanju', pending.length, 'var(--yellow)')}
@@ -2734,8 +2733,8 @@ async function openUserProfile(userId, userName) {
   if (existing) existing.remove();
   const ov = document.createElement('div');
   ov.id = 'ov-user-profile';
-  ov.className = 'ov ov-center on';
-  ov.style.cssText = 'z-index:10001;align-items:flex-start;padding-top:72px;overflow-y:auto;';
+  ov.className = 'ov on';
+  ov.style.cssText = 'z-index:10001;display:flex;align-items:flex-start;justify-content:center;padding-top:72px;overflow-y:auto;';
   ov.innerHTML = `
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
