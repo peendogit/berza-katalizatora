@@ -1179,6 +1179,22 @@ app.put('/api/auth/email-notify', auth, async (req, res) => {
   }
 });
 
+// GET /api/admin/listings/:id/ponude — sve ponude za oglas (admin)
+app.get('/api/admin/listings/:id/ponude', auth, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, u.name as buyer_name, u.city as buyer_city, u.tel as buyer_tel
+      FROM ponude p
+      JOIN users u ON u.id = p.buyer_id
+      WHERE p.listing_id = $1
+      ORDER BY p.cijena DESC
+    `, [req.params.id]);
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
 // ─── SPA fallback ─────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -1266,10 +1282,6 @@ async function expireOldListings() {
       SET status = 'expired'
       WHERE status = 'active'
         AND created_at < NOW() - INTERVAL '7 days'
-        AND id NOT IN (
-          SELECT DISTINCT listing_id FROM ponude
-          WHERE status IN ('pending', 'accepted')
-        )
       RETURNING id, user_id, marka, model
     `);
     if (result.rows.length > 0) {
