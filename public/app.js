@@ -3109,8 +3109,33 @@ async function toggleEmailNotify(val) {
   } catch(err) { toast('❌ ' + err.message, 'err'); }
 }
 
+// ═══════════════════════════════════════════════════════
+// GDPR COOKIE BANNER
+// ═══════════════════════════════════════════════════════
+function initCookieBanner() {
+  if (!localStorage.getItem('cookie_consent')) {
+    setTimeout(() => {
+      const b = document.getElementById('cookie-banner');
+      if (b) b.style.display = 'block';
+    }, 1200);
+  }
+}
+
+function acceptCookies() {
+  localStorage.setItem('cookie_consent', 'all');
+  const b = document.getElementById('cookie-banner');
+  if (b) { b.style.opacity='0'; b.style.transition='opacity .3s'; setTimeout(()=>b.remove(),300); }
+}
+
+function declineCookies() {
+  localStorage.setItem('cookie_consent', 'necessary');
+  const b = document.getElementById('cookie-banner');
+  if (b) { b.style.opacity='0'; b.style.transition='opacity .3s'; setTimeout(()=>b.remove(),300); }
+}
+
 // INIT
 initAC('reg-city', 'reg-country');
+initCookieBanner();
 
 // ── PWA Install ──────────────────────────────────────────
 let _installPrompt = null;
