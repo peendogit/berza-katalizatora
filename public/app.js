@@ -733,7 +733,7 @@ async function renderZavrseni() {
     const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
     const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
     const isPoslato = poslatoSet.has(l.id);
-    const isOpen = !isPoslato; // neposlato je defaultno otvoreno
+    const isOpen = true; // uvijek otvoreno da se vidi adresa i ocjena
 
     return `<div class="zav-card${isPoslato?' poslato':''}${isOpen?' open':''}" id="zav-${l.id}">
       <div class="zav-header" onclick="toggleZav(${l.id})">
