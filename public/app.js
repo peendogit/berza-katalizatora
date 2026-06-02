@@ -1572,7 +1572,7 @@ async function renderAdminUsers() {
     h+=rest.map(adminCard).join('');
   }
   if(!list.length) h=`<div class="empty"><div class="empty-icon">🔍</div><h3>Nema rezultata</h3></div>`;
-  document.getElementById('a-users').innerHTML=h;
+  document.getElementById('a-users').innerHTML = `<div class="admin-users-grid">${h}</div>`;
 }
 
 function adminCard(u) {
@@ -1979,7 +1979,7 @@ async function renderAdminOglasi() {
   el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
     const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status;
     const stColor = l.status==='active'?'ok':'wait';
-    return `<div class="admin-card" id="ac-l-${l.id}" style="flex-direction:column;gap:0;padding:0;overflow:hidden;cursor:pointer">
+    return `<div class="admin-oglas-card" id="ac-l-${l.id}" >
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px" onclick="admToggleOglas(${l.id})">
         <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
         <div style="flex:1;min-width:0">

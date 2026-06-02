@@ -221,8 +221,10 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 
 /* ADMIN */
 .admin-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;}
+.admin-oglas-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;cursor:pointer;}
 @media (min-width:601px) {
-  #a-users { max-width:680px; }
+  #a-users { max-width:100%; }
+  .admin-users-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 }
 .admin-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:#fff;flex-shrink:0;}
 .admin-acts{display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
