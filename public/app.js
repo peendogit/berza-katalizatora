@@ -205,18 +205,19 @@ async function doRegister() {
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
       showPage('page-register');
-      document.querySelector('#page-register .auth-card').innerHTML = `
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:48px;margin-bottom:16px">⏳</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;margin-bottom:10px;color:var(--text)">Nalog je kreiran!</div>
-          <div style="font-size:14px;color:var(--muted2);line-height:1.7">
+      const wrap = document.querySelector('#page-register .app-wrap');
+      if (wrap) wrap.innerHTML = `
+        <div style="text-align:center;padding:60px 20px">
+          <div style="font-size:56px;margin-bottom:16px">⏳</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;margin-bottom:12px;color:var(--text)">Nalog je kreiran!</div>
+          <div style="font-size:14px;color:var(--muted2);line-height:1.7;max-width:320px;margin:0 auto">
             Vaš nalog čeka odobrenje administratora.<br>
             Bićete obaviješteni emailom čim nalog postane aktivan.
           </div>
           <div style="margin-top:16px;font-size:12px;color:var(--muted)">
             Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:var(--orange)">berzakatalizatora@gmail.com</a>
           </div>
-          <button class="btn btn-ghost btn-sm" style="margin-top:20px" onclick="showLoginPage()">← Idi na prijavu</button>
+          <button class="btn btn-ghost btn-sm" style="margin-top:24px" onclick="showLoginPage()">← Idi na prijavu</button>
         </div>`;
       return;
     }
