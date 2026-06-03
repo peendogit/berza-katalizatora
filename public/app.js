@@ -204,21 +204,24 @@ async function doRegister() {
     const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
-      showPage('page-register');
-      const wrap = document.querySelector('#page-register .app-wrap');
-      if (wrap) wrap.innerHTML = `
-        <div style="text-align:center;padding:60px 20px">
+      showPage('page-hero');
+      // Prikaži modal čekanja
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+      ov.innerHTML = `
+        <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:32px 24px;max-width:360px;width:100%;text-align:center">
           <div style="font-size:56px;margin-bottom:16px">⏳</div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;margin-bottom:12px;color:var(--text)">Nalog je kreiran!</div>
-          <div style="font-size:14px;color:var(--muted2);line-height:1.7;max-width:320px;margin:0 auto">
+          <div style="font-size:14px;color:var(--muted2);line-height:1.7;margin-bottom:20px">
             Vaš nalog čeka odobrenje administratora.<br>
             Bićete obaviješteni emailom čim nalog postane aktivan.
           </div>
-          <div style="margin-top:16px;font-size:12px;color:var(--muted)">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:20px">
             Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:var(--orange)">berzakatalizatora@gmail.com</a>
           </div>
-          <button class="btn btn-ghost btn-sm" style="margin-top:24px" onclick="showLoginPage()">← Idi na prijavu</button>
+          <button class="btn btn-primary btn-block" onclick="this.closest('div[style]').remove()">U redu</button>
         </div>`;
+      document.body.appendChild(ov);
       return;
     }
     loginUser(user);
@@ -231,6 +234,19 @@ async function doRegister() {
 }
 
 function loginUser(u) {
+  // Blokira pending korisnike
+  if (u.status === 'pending') {
+    localStorage.removeItem('token');
+    showPage('page-hero');
+    toast('⏳ Vaš nalog još čeka odobrenje administratora.', '');
+    return;
+  }
+  if (u.status === 'blocked' || u.status === 'rejected') {
+    localStorage.removeItem('token');
+    showPage('page-hero');
+    toast('❌ Vaš nalog je blokiran. Kontaktirajte berzakatalizatora@gmail.com', 'err');
+    return;
+  }
   // Normalizuj snake_case polja iz API-ja u camelCase
   if (u.premium_until && !u.premiumUntil) u.premiumUntil = new Date(u.premium_until).getTime();
   if (u.default_dana && !u.defaultDana) u.defaultDana = u.default_dana;
