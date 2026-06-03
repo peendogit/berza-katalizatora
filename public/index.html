@@ -55,6 +55,19 @@
       ✉️ berzakatalizatora@gmail.com
     </a>
     <div style="font-size:11px;color:var(--muted);margin-top:16px">© 2025 Berza Katalizatora · BiH &amp; Srbija</div>
+    <div style="margin-top:10px">
+      <button onclick="openTerms()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline">Uslovi korišćenja i Politika privatnosti</button>
+    </div>
+  </div>
+</div>
+
+<!-- TERMS & CONDITIONS OVERLAY -->
+<div class="ov ov-center" id="ov-terms" onclick="if(event.target===this)closeOv('ov-terms')">
+  <div class="sheet sheet-center" style="max-width:640px;max-height:88vh;overflow-y:auto">
+    <button class="sheet-close" onclick="closeOv('ov-terms')">✕</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Uslovi korišćenja</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:20px">Posljednje ažuriranje: juni 2026.</div>
+    <div id="terms-content" style="font-size:13px;line-height:1.8;color:var(--muted2)"></div>
   </div>
 </div>
 
@@ -128,8 +141,28 @@
         <div class="fg"><label>Potvrdi lozinku *</label><input id="reg-pass2" type="password" placeholder="Ponovi lozinku"></div>
       </div>
 
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <input type="checkbox" id="reg-terms" style="margin-top:2px;flex-shrink:0;width:16px;height:16px;cursor:pointer">
+        <label for="reg-terms" style="font-size:12px;color:var(--muted2);cursor:pointer;line-height:1.5">
+          Pročitao/la sam i slažem se sa <button type="button" onclick="openTerms()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:12px;cursor:pointer;padding:0;font-family:Barlow,sans-serif;text-decoration:underline">Uslovima korišćenja i Politikom privatnosti</button> platforme Berza Katalizatora.
+        </label>
+      </div>
+
       <button class="btn btn-primary btn-block" id="reg-btn" onclick="doRegister()">Registruj se</button>
       <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Već imate nalog? <button onclick="showLoginPage()" style="background:none;border:none;color:var(--orange);font-weight:700;font-size:12px;cursor:pointer;font-family:Barlow,sans-serif">Prijavite se →</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- TERMS & CONDITIONS OVERLAY -->
+<div class="ov ov-center" id="ov-terms" onclick="if(event.target===this)closeOv('ov-terms')">
+  <div class="sheet sheet-center" style="max-width:640px;max-height:88vh;overflow-y:auto">
+    <button class="sheet-close" onclick="closeOv('ov-terms')">✕</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px;color:var(--text)">Uslovi korišćenja i Politika privatnosti</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:20px">Posljednje ažuriranje: juni 2026.</div>
+    <div id="terms-content" style="font-size:13px;line-height:1.8;color:var(--muted2)"></div>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <button class="btn btn-primary btn-block" onclick="acceptTermsAndClose()">✅ Razumijem i slažem se</button>
     </div>
   </div>
 </div>

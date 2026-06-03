@@ -192,7 +192,10 @@ async function doRegister() {
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
   const pass  = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
-  if (!name||!city||!tel||!email||!pass) { toast('Popunite sva obavezna polja', 'err'); return; }
+  if (!document.getElementById('reg-terms')?.checked) {
+    toast('Morate prihvatiti Uslove korišćenja', 'err');
+    return;
+  }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
   if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
   try {
@@ -3110,7 +3113,76 @@ async function toggleEmailNotify(val) {
 }
 
 // ═══════════════════════════════════════════════════════
-// GDPR COOKIE BANNER
+// TERMS & CONDITIONS
+// ═══════════════════════════════════════════════════════
+function openTerms() {
+  const content = document.getElementById('terms-content');
+  if (content && !content.innerHTML) {
+    content.innerHTML = `
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">1. Opšte odredbe</h3>
+<p>Berza Katalizatora (u daljem tekstu: "Platforma") je online tržište koje omogućava fizičkim i pravnim licima (u daljem tekstu: "Korisnici") da objavljuju i pregledaju oglase za prodaju katalizatora i DPF filtera. Platforma je u vlasništvu fizičkog lica sa sjedištem u Bijeljini, Bosna i Hercegovina.</p>
+<p>Korišćenjem Platforme prihvatate ove Uslove u potpunosti. Ako se ne slažete sa bilo kojim dijelom ovih Uslova, molimo vas da ne koristite Platformu.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">2. Opis usluge</h3>
+<p>Platforma pruža isključivo tehnički prostor za objavljivanje oglasa i komunikaciju između prodavača i otkupljivača katalizatora. Berza Katalizatora <strong style="color:var(--text)">nije stranka</strong> u bilo kakvoj transakciji između Korisnika i ne vrši posredovanje u kupoprodaji.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">3. Odricanje od odgovornosti</h3>
+<p><strong style="color:var(--text)">Platforma ne snosi nikakvu odgovornost</strong> za:</p>
+<ul style="padding-left:18px;margin:8px 0">
+  <li style="margin-bottom:6px">Tačnost, potpunost ili istinitost informacija koje Korisnici objavljuju u oglasima</li>
+  <li style="margin-bottom:6px">Kvalitet, stanje, autentičnost ili vrijednost robe koja je predmet oglasa</li>
+  <li style="margin-bottom:6px">Postupke, propuste ili namjere bilo kojeg Korisnika Platforme</li>
+  <li style="margin-bottom:6px">Finansijske gubitke, prevare ili sporove nastale između Korisnika</li>
+  <li style="margin-bottom:6px">Neisporuku robe, neplaćanje ili bilo koji drugi oblik neispunjenja obaveza između Korisnika</li>
+  <li style="margin-bottom:6px">Štetu nastalu usled korišćenja ili nemogućnosti korišćenja Platforme</li>
+</ul>
+<p>Sve transakcije se odvijaju isključivo između Korisnika, na njihovu vlastitu odgovornost.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">4. Obaveze Korisnika</h3>
+<p>Korisnici su dužni da:</p>
+<ul style="padding-left:18px;margin:8px 0">
+  <li style="margin-bottom:6px">Objavljuju isključivo tačne i istinite informacije o robi koju nude</li>
+  <li style="margin-bottom:6px">Ne objavljuju oglase za robu koja je ukradena, falsifikovana ili čija prodaja nije dozvoljena zakonom</li>
+  <li style="margin-bottom:6px">Ne koriste Platformu u svrhe prevare, uznemiravanja ili bilo koje druge protivpravne aktivnosti</li>
+  <li style="margin-bottom:6px">Postupaju u dobroj vjeri prema ostalim Korisnicima</li>
+  <li style="margin-bottom:6px">Preuzmu punu odgovornost za sve obaveze koje preuzmu putem Platforme</li>
+</ul>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">5. Zabranjeni sadržaj</h3>
+<p>Strogo je zabranjeno objavljivanje oglasa koji sadrže: robu nezakonito nabavljenu ili ukradenu, lažne ili manipulativne opise, kontakt podatke trećih lica bez njihovog pristanka, uvredljiv ili diskriminatorni sadržaj. Platforma zadržava pravo da bez prethodne najave ukloni svaki oglas koji smatra neprimjerenim ili koji krši ove Uslove.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">6. Prijava prevare i sporova</h3>
+<p>U slučaju sumnje na prevaru ili bilo koji oblik zloupotrebe, Korisnici su dužni prijaviti incident nadležnim organima (policija, tužilaštvo). Platforma može pružiti administrativnu podršku organima gonjenja dostavljanjem podataka o Korisnicima isključivo na osnovu valjane sudske odluke ili naloga nadležnog organa, u skladu sa važećim zakonodavstvom BiH i Srbije.</p>
+<p>Platforma <strong style="color:var(--text)">ne arbitrira</strong> u sporovima između Korisnika i nije nadležna za rješavanje reklamacija.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">7. Politika privatnosti i zaštita podataka</h3>
+<p>Platforma prikuplja sljedeće lične podatke pri registraciji: ime i prezime, grad, adresa, broj telefona i email adresa. Ovi podaci se koriste isključivo za funkcionisanje Platforme i komunikaciju između Korisnika.</p>
+<p>Platforma ne prodaje, ne iznajmljuje niti ne dijeli lične podatke Korisnika trećim stranama u komercijalne svrhe. Podaci se čuvaju na sigurnom serveru i zaštićeni su standardnim sigurnosnim mjerama.</p>
+<p>Korisnik ima pravo zatražiti brisanje svog naloga i svih povezanih podataka slanjem zahtjeva na: <strong style="color:var(--orange)">berzakatalizatora@gmail.com</strong></p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">8. Kolačići (Cookies)</h3>
+<p>Platforma koristi isključivo funkcionalne kolačiće neophodne za rad (sesija, prijava). Ne koriste se kolačići za praćenje, profilisanje ili oglašavanje.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">9. Izmjene Uslova</h3>
+<p>Platforma zadržava pravo izmjene ovih Uslova u bilo kojem trenutku. Korisnici će biti obaviješteni o značajnim izmjenama putem obavještenja na Platformi. Nastavak korišćenja Platforme nakon objave izmjena smatra se prihvatanjem novih Uslova.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">10. Nadležnost i mjerodavno pravo</h3>
+<p>Na ove Uslove primjenjuje se pravo Bosne i Hercegovine. Za sve sporove koji bi mogli nastati iz korišćenja Platforme nadležan je sud u Bijeljini, Bosna i Hercegovina.</p>
+
+<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">11. Kontakt</h3>
+<p>Za sva pitanja u vezi sa ovim Uslovima možete nas kontaktirati na: <strong style="color:var(--orange)">berzakatalizatora@gmail.com</strong></p>
+    `;
+  }
+  document.getElementById('ov-terms').classList.add('on');
+  _pushBack(() => closeOv('ov-terms'));
+}
+
+function acceptTermsAndClose() {
+  const chk = document.getElementById('reg-terms');
+  if (chk) chk.checked = true;
+  closeOv('ov-terms');
+  toast('✅ Uslovi prihvaćeni', 'ok');
+}
 // ═══════════════════════════════════════════════════════
 function initCookieBanner() {
   if (!localStorage.getItem('cookie_consent')) {
