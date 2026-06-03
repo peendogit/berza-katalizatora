@@ -203,8 +203,24 @@ async function doRegister() {
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
     const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
     localStorage.setItem('token', token);
+    if (user.status === 'pending') {
+      showPage('page-register');
+      document.querySelector('#page-register .auth-card').innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:48px;margin-bottom:16px">⏳</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;margin-bottom:10px;color:var(--text)">Nalog je kreiran!</div>
+          <div style="font-size:14px;color:var(--muted2);line-height:1.7">
+            Vaš nalog čeka odobrenje administratora.<br>
+            Bićete obaviješteni emailom čim nalog postane aktivan.
+          </div>
+          <div style="margin-top:16px;font-size:12px;color:var(--muted)">
+            Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:var(--orange)">berzakatalizatora@gmail.com</a>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:20px" onclick="showLoginPage()">← Idi na prijavu</button>
+        </div>`;
+      return;
+    }
     loginUser(user);
-    if (user.status === 'pending') toast('✅ Registracija uspješna! Čekate odobrenje admina.', 'ok');
   } catch (err) {
     toast('❌ ' + err.message, 'err');
   } finally {
@@ -1585,10 +1601,14 @@ let adminFilterCountry = 'all';
 
 function setAdminFilter(f) {
   adminFilterRole = f;
-  ['all','seller','buyer'].forEach(x=>{
+  ['all','seller','buyer','pending'].forEach(x=>{
     const b=document.getElementById('af-'+x);
     if(b) b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost');
   });
+  // Poseban stil za pending
+  const pb = document.getElementById('af-pending');
+  if (pb && f !== 'pending') pb.style.cssText = 'border-color:var(--yellow);color:var(--yellow)';
+  else if (pb) pb.style.cssText = '';
   renderAdminUsers();
 }
 
@@ -1612,9 +1632,20 @@ async function renderAdminUsers() {
     }));
   } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
   let list=USERS.filter(u=>u.role!=='admin');
-  if (adminFilterRole !== 'all') list = list.filter(u => u.role === adminFilterRole);
-  if (adminFilterCountry !== 'all') list = list.filter(u => (u.country||'BA').toUpperCase() === adminFilterCountry);
+  if (adminFilterRole === 'pending') {
+    list = list.filter(u => u.status === 'pending');
+  } else {
+    if (adminFilterRole !== 'all') list = list.filter(u => u.role === adminFilterRole);
+    if (adminFilterCountry !== 'all') list = list.filter(u => (u.country||'BA').toUpperCase() === adminFilterCountry);
+  }
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
+
+  // Ažuriraj pending badge
+  const pendingCount = USERS.filter(u => u.role !== 'admin' && u.status === 'pending').length;
+  const pcBadge = document.getElementById('pending-count-badge');
+  const adminBadgeEl = document.getElementById('admin-badge');
+  if (pcBadge) { pcBadge.textContent = pendingCount; pcBadge.style.display = pendingCount > 0 ? 'inline' : 'none'; }
+  if (adminBadgeEl) { adminBadgeEl.textContent = pendingCount; adminBadgeEl.style.display = pendingCount > 0 ? 'inline' : 'none'; }
   const pend=list.filter(u=>u.status==='pending');
   const rest=list.filter(u=>u.status!=='pending');
   const badge=document.getElementById('admin-badge');
@@ -2080,7 +2111,8 @@ async function renderAdminOglasi() {
   el.innerHTML = (paginated.length ? paginated.map(l => {
     const isLot = l.listing_type === 'lot';
     const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status==='expired'?'Istekao':'—';
-    const stColor = l.status==='active'?'ok':l.status==='finished'||l.status==='sent'?'ok':'wait';
+    const stColor = l.status==='active'?'ok':l.status==='finished'?'ok':l.status==='sent'?'blue':'wait';
+    const stStyle = l.status==='sent' ? 'background:rgba(41,128,185,.15);color:#5dade2;border:1px solid rgba(41,128,185,.3)' : '';
     return `<div class="admin-oglas-card" id="ac-l-${l.id}">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer" onclick="admToggleOglas(${l.id})">
         <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'🪙')}</div>
@@ -2088,7 +2120,7 @@ async function renderAdminOglasi() {
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
             ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${l.marka} ${l.model}${l.god?' ('+l.god+')':''}
           </div>
-          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px">${stLabel}</span></div>
+          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px;${stStyle}">${stLabel}</span></div>
         </div>
         <span style="color:var(--muted);font-size:12px;flex-shrink:0">▼</span>
       </div>
