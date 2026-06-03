@@ -199,7 +199,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const status = role === 'buyer' ? 'pending' : 'approved';
+    const status = 'pending'; // svi novi korisnici čekaju odobrenje
 
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, name, role, status, city, addr, tel, country)
@@ -212,6 +212,23 @@ app.post('/api/auth/register', async (req, res) => {
     const sessionToken = require('crypto').randomBytes(32).toString('hex');
     await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [sessionToken, user.id]);
     _sessionCache.set(user.id, sessionToken);
+
+    // Email adminu o novom korisniku
+    const roleLabel = role === 'seller' ? 'Prodavač' : 'Otkupljivač';
+    sendEmail(
+      process.env.SMTP_USER,
+      `🆕 Novi ${roleLabel} čeka odobrenje — ${name}`,
+      `<p>Novi korisnik se registrovao i čeka odobrenje:</p>
+       <ul>
+         <li><b>Ime:</b> ${name}</li>
+         <li><b>Uloga:</b> ${roleLabel}</li>
+         <li><b>Email:</b> ${email}</li>
+         <li><b>Grad:</b> ${city || '—'}</li>
+         <li><b>Telefon:</b> ${tel || '—'}</li>
+       </ul>
+       <p>Prijavite se u admin panel da odobrite nalog.</p>`
+    ).catch(() => {});
+
     const token = jwt.sign({ id: user.id, role: user.role, email: user.email, country: user.country, st: sessionToken }, JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({ user, token });
   } catch (err) {
@@ -237,6 +254,20 @@ app.post('/api/auth/login', async (req, res) => {
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Pogrešan email ili lozinka' });
+
+    // Provjera statusa naloga
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        error: 'Vaš nalog čeka odobrenje administratora. Bićete obaviješteni kada nalog bude aktivan.',
+        code: 'PENDING'
+      });
+    }
+    if (user.status === 'blocked') {
+      return res.status(403).json({
+        error: 'Vaš nalog je blokiran. Kontaktirajte nas na berzakatalizatora@gmail.com',
+        code: 'BLOCKED'
+      });
+    }
 
     delete user.password_hash;
 
@@ -930,6 +961,12 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
 app.put('/api/admin/users/:id/approve', auth, adminOnly, async (req, res) => {
   try {
     await pool.query(`UPDATE users SET status = 'approved' WHERE id = $1`, [req.params.id]);
+    // Email korisniku
+    notifyUser(req.params.id,
+      '✅ Vaš nalog je odobren — Berza Katalizatora',
+      `<p>Dobra vijest! Vaš nalog na Berza Katalizatora je odobren.</p>
+       <p>Možete se odmah prijaviti na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
+    ).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Greška' });
