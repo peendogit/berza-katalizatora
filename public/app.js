@@ -207,23 +207,23 @@ async function doRegister() {
     const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity });
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
-      showPage('page-hero');
-      // Prikaži modal čekanja
+      const existing = document.getElementById('ov-pending');
+      if (existing) existing.remove();
       const ov = document.createElement('div');
       ov.id = 'ov-pending';
-      ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:20px';
       ov.innerHTML = `
-        <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:32px 24px;max-width:360px;width:100%;text-align:center">
+        <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:32px 24px;max-width:360px;width:100%;text-align:center">
           <div style="font-size:56px;margin-bottom:16px">⏳</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;margin-bottom:12px;color:var(--text)">Nalog je kreiran!</div>
-          <div style="font-size:14px;color:var(--muted2);line-height:1.7;margin-bottom:20px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;margin-bottom:12px;color:#fff">Nalog je kreiran!</div>
+          <div style="font-size:14px;color:#aaa;line-height:1.7;margin-bottom:20px">
             Vaš nalog čeka odobrenje administratora.<br>
             Bićete obaviješteni emailom čim nalog postane aktivan.
           </div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:20px">
-            Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:var(--orange)">berzakatalizatora@gmail.com</a>
+          <div style="font-size:12px;color:#666;margin-bottom:20px">
+            Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:#f4772e">berzakatalizatora@gmail.com</a>
           </div>
-          <button class="btn btn-primary btn-block" onclick="document.getElementById('ov-pending').remove()">U redu</button>
+          <button onclick="document.getElementById('ov-pending').remove();showLoginPage()" style="background:#f4772e;border:none;color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;padding:12px 32px;border-radius:8px;cursor:pointer;width:100%">U redu</button>
         </div>`;
       document.body.appendChild(ov);
       return;
@@ -1717,7 +1717,7 @@ function adminCard(u) {
       <div class="admin-av" style="background:${col};width:32px;height:32px;font-size:12px;flex-shrink:0">${initials(u.name)}</div>
       <div style="min-width:0;flex:1">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${pB}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email} · ${u.city||'—'} · ${u.tel||'—'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.fullname ? `<span style="color:var(--muted2)">${u.fullname}</span> · ` : ''}${u.email} · ${u.city||'—'} · ${u.tel||'—'}</div>
       </div>
     </div>
     <div style="flex-shrink:0;margin-left:6px">
@@ -1813,8 +1813,9 @@ async function toggleUserDetail(uid) {
   } catch(e) {}
 
   let h=`<div style="padding:4px 0">`;
-  // Samo datum i premium — ime/email/grad/tel već vidljivi na kartici iznad
   h+=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+    ${u.fullname ? `<span style="color:var(--text);font-weight:600">${u.fullname}</span> &nbsp;·&nbsp; ` : ''}
+    ${u.entity === 'firma' ? '🏢 Firma &nbsp;·&nbsp; ' : u.entity === 'fizicko' ? '👤 Fizičko lice &nbsp;·&nbsp; ' : ''}
     Registrovan: ${fmtDate(new Date(u.created_at).getTime())}
     ${u.premium && u.premiumUntil ? ` &nbsp;·&nbsp; <span style="color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</span>` : ''}
   </div>
