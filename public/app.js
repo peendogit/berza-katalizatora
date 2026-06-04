@@ -210,6 +210,7 @@ async function doRegister() {
       showPage('page-hero');
       // Prikaži modal čekanja
       const ov = document.createElement('div');
+      ov.id = 'ov-pending';
       ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
       ov.innerHTML = `
         <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:32px 24px;max-width:360px;width:100%;text-align:center">
@@ -222,7 +223,7 @@ async function doRegister() {
           <div style="font-size:12px;color:var(--muted);margin-bottom:20px">
             Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:var(--orange)">berzakatalizatora@gmail.com</a>
           </div>
-          <button class="btn btn-primary btn-block" onclick="this.closest('div[style]').remove()">U redu</button>
+          <button class="btn btn-primary btn-block" onclick="document.getElementById('ov-pending').remove()">U redu</button>
         </div>`;
       document.body.appendChild(ov);
       return;
