@@ -184,7 +184,7 @@ function invalidateCache(key) { delete _serverCache[key]; }
 // POST /api/auth/register
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, role, city, addr, tel, country } = req.body;
+    const { email, password, name, fullname, role, city, addr, tel, country, entity } = req.body;
     if (!email || !password || !name || !role) {
       return res.status(400).json({ error: 'Popunite sva obavezna polja' });
     }
@@ -202,10 +202,10 @@ app.post('/api/auth/register', async (req, res) => {
     const status = 'pending'; // svi novi korisnici čekaju odobrenje
 
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, name, role, status, city, addr, tel, country)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, email, name, role, status, city, addr, tel, premium, country, created_at`,
-      [email.toLowerCase(), hash, name, role, status, city || '', addr || '', tel || '', userCountry]
+      `INSERT INTO users (email, password_hash, name, fullname, role, status, city, addr, tel, country, entity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, email, name, fullname, role, status, city, addr, tel, premium, country, entity, created_at`,
+      [email.toLowerCase(), hash, name, fullname||'', role, status, city||'', addr||'', tel||'', userCountry, entity||'fizicko']
     );
 
     const user = result.rows[0];
@@ -1312,6 +1312,7 @@ app.get('*', (req, res) => {
       )
     `);
 
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS fullname VARCHAR(200) DEFAULT ''`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS session_token VARCHAR(64)`);
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS listing_type VARCHAR(10) DEFAULT 'single'`);
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS lot_items JSONB DEFAULT '[]'`);
