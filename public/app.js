@@ -3263,6 +3263,70 @@ function declineCookies() {
   if (b) { b.style.opacity='0'; b.style.transition='opacity .3s'; setTimeout(()=>b.remove(),300); }
 }
 
+// ═══════════════════════════════════════════════════════
+// SWIPE NAVIGACIJA IZMEĐU TABOVA
+// ═══════════════════════════════════════════════════════
+(function() {
+  const SELLER_TABS = ['oglasi','poruke','zavrseni'];
+  const BUYER_TABS  = ['oglasi','moje','zavrseni','poruke'];
+  const ADMIN_TABS  = ['users','oglasi','analitika'];
+
+  let _sx = 0, _sy = 0, _swiping = false;
+
+  function currentTab(tabs, prefix) {
+    for (const t of tabs) {
+      const el = document.getElementById(prefix + t);
+      if (el && el.classList.contains('on')) return t;
+    }
+    return tabs[0];
+  }
+
+  function swipeToTab(dir) {
+    // dir: 1 = lijevo (sljedeći), -1 = desno (prethodni)
+    const seller = document.getElementById('page-seller');
+    const buyer  = document.getElementById('page-buyer');
+    const admin  = document.getElementById('page-admin');
+
+    if (seller && seller.classList.contains('on')) {
+      const cur = currentTab(SELLER_TABS, 'sp-');
+      const idx = SELLER_TABS.indexOf(cur);
+      const next = SELLER_TABS[idx + dir];
+      if (next) sTab(next);
+    } else if (buyer && buyer.classList.contains('on')) {
+      const cur = currentTab(BUYER_TABS, 'bp-');
+      const idx = BUYER_TABS.indexOf(cur);
+      const next = BUYER_TABS[idx + dir];
+      if (next) bTab(next);
+    } else if (admin && admin.classList.contains('on')) {
+      const cur = currentTab(ADMIN_TABS, 'ap-');
+      const idx = ADMIN_TABS.indexOf(cur);
+      const next = ADMIN_TABS[idx + dir];
+      if (next) aTab(next);
+    }
+  }
+
+  document.addEventListener('touchstart', e => {
+    // Ignoriraj ako je overlay otvoren
+    if (document.querySelector('.ov.on')) return;
+    // Ignoriši ako je u scrollable elementu sa horizontalnim scrollom
+    const tgt = e.target.closest('.oglas-list,.oglas-card,.prev-grid,.chat-msgs');
+    if (tgt) return;
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+    _swiping = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!_swiping) return;
+    _swiping = false;
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    // Mora biti horizontalni swipe (dx > dy) i dovoljno dug (>60px)
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
+    swipeToTab(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
 // INIT
 initAC('reg-city', 'reg-country');
 initCookieBanner();
