@@ -2822,24 +2822,29 @@ let lastSeenPonude = {}; // lid -> broj ponuda kad je zadnji put gledao
 
 function updateOglasiBadge() {
   if (!CU || CU.role !== 'seller') return;
-  const mine = LISTINGS.filter(l => l.uid === CU.id);
-  let newCount = 0;
+  const mine = LISTINGS.filter(l => l.uid === CU.id && l.status === 'active');
+  let totalPending = 0;
   mine.forEach(l => {
+    // Koristi _ponuda_count iz API-ja (ukupan broj ponuda)
+    const count = parseInt(l._ponuda_count || l.ponuda_count || 0);
     const seen = lastSeenPonude[l.id] || 0;
-    const newP = l.ponude.filter(p => p.status === 'pending').length;
-    if (newP > seen) newCount += (newP - seen);
+    if (count > seen) totalPending += (count - seen);
   });
   const b = document.getElementById('oglasi-badge');
-  if (b) { b.style.display = newCount ? 'inline' : 'none'; b.textContent = newCount; }
+  const bb = document.getElementById('sbn-oglasi-badge');
+  if (b) { b.style.display = totalPending ? 'inline' : 'none'; b.textContent = totalPending || ''; }
+  if (bb) { bb.style.display = totalPending ? 'inline' : 'none'; bb.textContent = totalPending || ''; }
 }
 
 function markOglasiSeen() {
   if (!CU) return;
-  LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
-    lastSeenPonude[l.id] = l.ponude.filter(p => p.status === 'pending').length;
+  LISTINGS.filter(l => l.uid === CU.id && l.status === 'active').forEach(l => {
+    lastSeenPonude[l.id] = parseInt(l._ponuda_count || l.ponuda_count || 0);
   });
   const b = document.getElementById('oglasi-badge');
-  if (b) b.style.display = 'none';
+  const bb = document.getElementById('sbn-oglasi-badge');
+  if (b) { b.style.display = 'none'; b.textContent = ''; }
+  if (bb) { bb.style.display = 'none'; bb.textContent = ''; }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3271,7 +3276,17 @@ function declineCookies() {
   const BUYER_TABS  = ['oglasi','moje','zavrseni','poruke'];
   const ADMIN_TABS  = ['users','oglasi','analitika'];
 
-  let _sx = 0, _sy = 0, _swiping = false;
+  let _sx = 0, _sy = 0;
+
+  function activePage() {
+    const s = document.getElementById('page-seller');
+    const b = document.getElementById('page-buyer');
+    const a = document.getElementById('page-admin');
+    if (s && s.style.display !== 'none' && s.style.display !== '') return 'seller';
+    if (b && b.style.display !== 'none' && b.style.display !== '') return 'buyer';
+    if (a && a.style.display !== 'none' && a.style.display !== '') return 'admin';
+    return null;
+  }
 
   function currentTab(tabs, prefix) {
     for (const t of tabs) {
@@ -3282,47 +3297,36 @@ function declineCookies() {
   }
 
   function swipeToTab(dir) {
-    // dir: 1 = lijevo (sljedeći), -1 = desno (prethodni)
-    const seller = document.getElementById('page-seller');
-    const buyer  = document.getElementById('page-buyer');
-    const admin  = document.getElementById('page-admin');
-
-    if (seller && seller.classList.contains('on')) {
-      const cur = currentTab(SELLER_TABS, 'sp-');
-      const idx = SELLER_TABS.indexOf(cur);
+    const page = activePage();
+    if (!page) return;
+    if (page === 'seller') {
+      const idx = SELLER_TABS.indexOf(currentTab(SELLER_TABS, 'sp-'));
       const next = SELLER_TABS[idx + dir];
       if (next) sTab(next);
-    } else if (buyer && buyer.classList.contains('on')) {
-      const cur = currentTab(BUYER_TABS, 'bp-');
-      const idx = BUYER_TABS.indexOf(cur);
+    } else if (page === 'buyer') {
+      const idx = BUYER_TABS.indexOf(currentTab(BUYER_TABS, 'bp-'));
       const next = BUYER_TABS[idx + dir];
       if (next) bTab(next);
-    } else if (admin && admin.classList.contains('on')) {
-      const cur = currentTab(ADMIN_TABS, 'ap-');
-      const idx = ADMIN_TABS.indexOf(cur);
+    } else if (page === 'admin') {
+      const idx = ADMIN_TABS.indexOf(currentTab(ADMIN_TABS, 'ap-'));
       const next = ADMIN_TABS[idx + dir];
       if (next) aTab(next);
     }
   }
 
   document.addEventListener('touchstart', e => {
-    // Ignoriraj ako je overlay otvoren
     if (document.querySelector('.ov.on')) return;
-    // Ignoriši ako je u scrollable elementu sa horizontalnim scrollom
-    const tgt = e.target.closest('.oglas-list,.oglas-card,.prev-grid,.chat-msgs');
-    if (tgt) return;
     _sx = e.touches[0].clientX;
     _sy = e.touches[0].clientY;
-    _swiping = true;
   }, { passive: true });
 
   document.addEventListener('touchend', e => {
-    if (!_swiping) return;
-    _swiping = false;
     const dx = e.changedTouches[0].clientX - _sx;
     const dy = e.changedTouches[0].clientY - _sy;
-    // Mora biti horizontalni swipe (dx > dy) i dovoljno dug (>60px)
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
+    // Ignoriši swipe ako je na chat ili lightbox
+    const tgt = e.target;
+    if (tgt.closest('.chat-msgs,.lightbox,#lightbox')) return;
     swipeToTab(dx < 0 ? 1 : -1);
   }, { passive: true });
 })();
