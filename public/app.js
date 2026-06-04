@@ -186,6 +186,7 @@ async function doLogin() {
 
 async function doRegister() {
   const name  = document.getElementById('reg-name').value.trim();
+  const fullname = selEntity === 'fizicko' ? (document.getElementById('reg-fullname')?.value.trim() || '') : '';
   const city  = document.getElementById('reg-city').value.trim();
   const addr  = document.getElementById('reg-addr').value.trim();
   const tel   = document.getElementById('reg-tel').value.trim();
@@ -196,12 +197,14 @@ async function doRegister() {
     toast('Morate prihvatiti Uslove korišćenja', 'err');
     return;
   }
+  if (!name) { toast('Unesite korisničko ime / naziv firme', 'err'); return; }
+  if (selEntity === 'fizicko' && !fullname) { toast('Unesite ime i prezime', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
   if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity });
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
       showPage('page-hero');
@@ -325,12 +328,15 @@ function pickEntity(e) {
   document.getElementById('ent-firma').classList.toggle('sel', e==='firma');
   const lbl = document.getElementById('reg-name-label');
   const inp = document.getElementById('reg-name');
+  const fullnameWrap = document.getElementById('reg-fullname-wrap');
   if (e === 'firma') {
     if (lbl) lbl.textContent = 'Naziv firme *';
     if (inp) inp.placeholder = '';
+    if (fullnameWrap) fullnameWrap.style.display = 'none';
   } else {
     if (lbl) lbl.textContent = 'Korisničko ime *';
     if (inp) inp.placeholder = '';
+    if (fullnameWrap) fullnameWrap.style.display = '';
   }
 }
 function pickPM(m) {
