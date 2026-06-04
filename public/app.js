@@ -315,7 +315,8 @@ function pickRole(r) {
   document.getElementById('role-seller').classList.toggle('sel', r==='seller');
   document.getElementById('role-buyer').classList.toggle('sel', r==='buyer');
   document.getElementById('reg-btn').textContent = 'Registruj se';
-  document.getElementById('reg-entity-wrap').style.display = r==='buyer' ? '' : 'none';
+  // Entity wrap uvijek vidljiv za oba tipa
+  document.getElementById('reg-entity-wrap').style.display = '';
   pickEntity(selEntity); // refresh label
 }
 function pickEntity(e) {
@@ -325,11 +326,11 @@ function pickEntity(e) {
   const lbl = document.getElementById('reg-name-label');
   const inp = document.getElementById('reg-name');
   if (e === 'firma') {
-    lbl.textContent = 'Naziv firme *';
-    inp.placeholder = 'npr. AutoKat d.o.o.';
+    if (lbl) lbl.textContent = 'Naziv firme *';
+    if (inp) inp.placeholder = '';
   } else {
-    lbl.textContent = 'Ime i prezime *';
-    inp.placeholder = 'npr. Mirko Perić';
+    if (lbl) lbl.textContent = 'Korisničko ime *';
+    if (inp) inp.placeholder = '';
   }
 }
 function pickPM(m) {

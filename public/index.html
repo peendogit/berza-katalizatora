@@ -102,21 +102,21 @@
         <div class="role-card sel" id="role-seller" onclick="pickRole('seller')"><div class="role-icon">🚗</div><div class="role-name">Prodavač</div><div class="role-desc">Imam katalizator za prodaju</div></div>
         <div class="role-card" id="role-buyer" onclick="pickRole('buyer')"><div class="role-icon">🏭</div><div class="role-name">Otkupljivač</div><div class="role-desc">Firma / otkup katalizatora</div></div>
       </div>
-      <div id="reg-entity-wrap" style="display:none">
-        <div class="role-grid" style="margin-bottom:14px">
+      <div id="reg-entity-wrap" style="margin-bottom:14px">
+        <div class="role-grid">
           <div class="role-card sel" id="ent-fizicko" onclick="pickEntity('fizicko')">
             <div class="role-icon">👤</div>
             <div class="role-name">Fizičko lice</div>
-            <div class="role-desc">Kupujem kao privatna osoba</div>
+            <div class="role-desc">Privatna osoba</div>
           </div>
           <div class="role-card" id="ent-firma" onclick="pickEntity('firma')">
             <div class="role-icon">🏢</div>
             <div class="role-name">Firma</div>
-            <div class="role-desc">Kupujem kao pravno lice</div>
+            <div class="role-desc">Pravno lice</div>
           </div>
         </div>
       </div>
-      <div class="fg"><label id="reg-name-label">Ime i prezime *</label><input id="reg-name" placeholder="npr. Mirko Perić"></div>
+      <div class="fg"><label id="reg-name-label">Korisničko ime *</label><input id="reg-name" placeholder=""></div>
       <div class="row2">
         <div class="fg"><label>Država *</label>
           <select id="reg-country" onchange="onCountryChange('reg-country','reg-city')">
@@ -126,16 +126,16 @@
         </div>
         <div class="fg"><label>Grad *</label>
           <div class="ac-wrap">
-            <input id="reg-city" placeholder="Upiši grad..." autocomplete="off">
+            <input id="reg-city" placeholder="" autocomplete="off">
             <div class="ac-list" id="ac-reg-city"></div>
           </div>
         </div>
       </div>
       <div class="row2">
-        <div class="fg"><label>Adresa</label><input id="reg-addr" placeholder="Ul. i broj"></div>
-        <div class="fg"><label>Telefon *</label><input id="reg-tel" placeholder="+387 61 ..."></div>
+        <div class="fg"><label>Adresa</label><input id="reg-addr" placeholder=""></div>
+        <div class="fg"><label>Telefon *</label><input id="reg-tel" placeholder=""></div>
       </div>
-      <div class="fg"><label>Email *</label><input id="reg-email" type="email" placeholder="vas@email.com"></div>
+      <div class="fg"><label>Email *</label><input id="reg-email" type="email" placeholder=""></div>
       <div class="row2">
         <div class="fg"><label>Lozinka *</label><input id="reg-pass" type="password" placeholder="Min. 6 znakova"></div>
         <div class="fg"><label>Potvrdi lozinku *</label><input id="reg-pass2" type="password" placeholder="Ponovi lozinku"></div>
