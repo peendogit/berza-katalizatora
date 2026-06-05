@@ -3284,18 +3284,25 @@ function declineCookies() {
   function swipeToTab(dir) {
     const page = activePage();
     if (!page) return;
-    if (page === 'seller') {
-      const idx = SELLER_TABS.indexOf(currentTab(SELLER_TABS, 'sp-'));
-      const next = SELLER_TABS[idx + dir];
-      if (next) sTab(next);
-    } else if (page === 'buyer') {
-      const idx = BUYER_TABS.indexOf(currentTab(BUYER_TABS, 'bp-'));
-      const next = BUYER_TABS[idx + dir];
-      if (next) bTab(next);
-    } else if (page === 'admin') {
-      const idx = ADMIN_TABS.indexOf(currentTab(ADMIN_TABS, 'ap-'));
-      const next = ADMIN_TABS[idx + dir];
-      if (next) aTab(next);
+
+    let tabs, prefix, fn;
+    if (page === 'seller') { tabs = SELLER_TABS; prefix = 'sp-'; fn = sTab; }
+    else if (page === 'buyer') { tabs = BUYER_TABS; prefix = 'bp-'; fn = bTab; }
+    else if (page === 'admin') { tabs = ADMIN_TABS; prefix = 'ap-'; fn = aTab; }
+    else return;
+
+    const idx = tabs.indexOf(currentTab(tabs, prefix));
+    const nextTab = tabs[idx + dir];
+    if (!nextTab) return;
+
+    // Animiraj novi tab
+    fn(nextTab);
+    const newPane = document.getElementById(prefix + nextTab);
+    if (newPane) {
+      newPane.classList.remove('slide-in-left', 'slide-in-right');
+      void newPane.offsetWidth; // reflow
+      newPane.classList.add(dir > 0 ? 'slide-in-left' : 'slide-in-right');
+      setTimeout(() => newPane.classList.remove('slide-in-left', 'slide-in-right'), 300);
     }
   }
 

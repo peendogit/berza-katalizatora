@@ -128,7 +128,18 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .nt.on{color:var(--orange);border-bottom-color:var(--orange);}
 .nt:hover:not(.on){color:var(--text);}
 .tab-pane{display:none;}
-.tab-pane.on{display:block;animation:slideUp .18s ease;}
+.tab-pane.on{display:block;}
+.tab-pane.slide-in-left  { animation: tabSlideInLeft  .25s cubic-bezier(.25,.46,.45,.94) both; }
+.tab-pane.slide-in-right { animation: tabSlideInRight .25s cubic-bezier(.25,.46,.45,.94) both; }
+
+@keyframes tabSlideInLeft {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes tabSlideInRight {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
 
 /* UPLOAD */
 .upload-zone{background:var(--panel);border:1.5px dashed var(--border2);border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;}
