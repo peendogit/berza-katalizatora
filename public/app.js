@@ -2732,18 +2732,6 @@ function pushNav(state) {
   history.pushState(state, '');
 }
 
-function restoreNav(state) {
-  if (!state) return;
-  if (state.page) {
-    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    const pg = document.getElementById(state.page);
-    if (pg) pg.style.display = '';
-  }
-  if (state.stab) sTabSilent(state.stab);
-  if (state.btab) bTabSilent(state.btab);
-  if (state.atab) aTabSilent(state.atab);
-}
-
 // Init state pri učitavanju
 history.replaceState({ backStack: 0 }, '');
 
@@ -3279,12 +3267,9 @@ function declineCookies() {
   let _sx = 0, _sy = 0;
 
   function activePage() {
-    const s = document.getElementById('page-seller');
-    const b = document.getElementById('page-buyer');
-    const a = document.getElementById('page-admin');
-    if (s && s.style.display !== 'none' && s.style.display !== '') return 'seller';
-    if (b && b.style.display !== 'none' && b.style.display !== '') return 'buyer';
-    if (a && a.style.display !== 'none' && a.style.display !== '') return 'admin';
+    if (document.getElementById('page-seller')?.style.display === 'block') return 'seller';
+    if (document.getElementById('page-buyer')?.style.display === 'block') return 'buyer';
+    if (document.getElementById('page-admin')?.style.display === 'block') return 'admin';
     return null;
   }
 
