@@ -131,32 +131,24 @@ const upload = multer({
 });
 
 // ─── JWT Auth Middleware ──────────────────────────────────
-// In-memory session cache: userId -> sessionToken
-const _sessionCache = new Map();
-
 function auth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Niste prijavljeni' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    // Ako token ima session_token (st), provjeri da li je aktivan
-    if (decoded.st) {
-      const cached = _sessionCache.get(decoded.id);
-      if (cached !== undefined) {
-        // Imamo cached vrijednost — provjeri odmah
-        if (cached !== decoded.st) {
+    req.user = decoded;
+    // Ako token nema st (stari token), propusti bez provjere
+    if (!decoded.st) return next();
+    // Provjeri session token u DB
+    pool.query('SELECT session_token FROM users WHERE id = $1', [decoded.id])
+      .then(r => {
+        if (!r.rows[0]) return res.status(401).json({ error: 'Korisnik ne postoji' });
+        if (r.rows[0].session_token !== decoded.st) {
           return res.status(401).json({ error: 'Prijavljeni ste na drugom uređaju. Molimo prijavite se ponovo.' });
         }
-      } else {
-        // Fetchaj iz baze i cachej (async, ali odbij ako se razlikuje)
-        pool.query('SELECT session_token FROM users WHERE id = $1', [decoded.id])
-          .then(r => {
-            if (r.rows[0]) _sessionCache.set(decoded.id, r.rows[0].session_token);
-          }).catch(() => {});
-      }
-    }
-    req.user = decoded;
-    next();
+        next();
+      })
+      .catch(() => next()); // DB greška — propusti da ne blokiramo
   } catch {
     res.status(401).json({ error: 'Token nije validan' });
   }
@@ -211,7 +203,6 @@ app.post('/api/auth/register', async (req, res) => {
     const user = result.rows[0];
     const sessionToken = require('crypto').randomBytes(32).toString('hex');
     await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [sessionToken, user.id]);
-    _sessionCache.set(user.id, sessionToken);
 
     // Email adminu o novom korisniku
     const roleLabel = role === 'seller' ? 'Prodavač' : 'Otkupljivač';
@@ -275,7 +266,6 @@ app.post('/api/auth/login', async (req, res) => {
     const sessionToken = require('crypto').randomBytes(32).toString('hex');
     await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [sessionToken, user.id]);
     // Ažuriraj in-memory cache odmah
-    _sessionCache.set(user.id, sessionToken);
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email, country: user.country, st: sessionToken },
