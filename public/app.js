@@ -3299,10 +3299,12 @@ function declineCookies() {
     fn(nextTab);
     const newPane = document.getElementById(prefix + nextTab);
     if (newPane) {
+      const cls = dir > 0 ? 'slide-in-left' : 'slide-in-right';
       newPane.classList.remove('slide-in-left', 'slide-in-right');
-      void newPane.offsetWidth; // reflow
-      newPane.classList.add(dir > 0 ? 'slide-in-left' : 'slide-in-right');
-      setTimeout(() => newPane.classList.remove('slide-in-left', 'slide-in-right'), 300);
+      requestAnimationFrame(() => {
+        newPane.classList.add(cls);
+        setTimeout(() => newPane.classList.remove(cls), 300);
+      });
     }
   }
 
