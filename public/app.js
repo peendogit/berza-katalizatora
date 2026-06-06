@@ -544,7 +544,8 @@ async function renderMyListings() {
     const data = await cachedListings();
     LISTINGS = data.map(l => ({
       ...parseListing(l),
-      _ponuda_count: parseInt(l.ponuda_count)||0
+      _ponuda_count: parseInt(l.ponuda_count)||0,
+      _pending_count: parseInt(l.pending_count)||0
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
   expireOld();
@@ -559,7 +560,7 @@ async function renderMyListings() {
 
   const activeHtml = mine.length ? mine.map(l => {
     const pend = l.ponude.filter(p => p.status==='pending').length;
-    const totalPonuda = pend || parseInt(l.pending_count||l._ponuda_count||0);
+    const totalPonuda = pend || parseInt(l._pending_count||0);
     const hasPending = totalPonuda > 0;
     const badge = hasPending
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${totalPonuda} ${totalPonuda===1?'ponuda':'ponude'} ▾</span>`
@@ -2813,8 +2814,7 @@ function updateOglasiBadge() {
   const mine = LISTINGS.filter(l => l.uid === CU.id && l.status === 'active');
   let totalPending = 0;
   mine.forEach(l => {
-    // Koristi _ponuda_count iz API-ja (ukupan broj ponuda)
-    const count = parseInt(l._ponuda_count || l.ponuda_count || 0);
+    const count = parseInt(l._pending_count || 0);
     const seen = lastSeenPonude[l.id] || 0;
     if (count > seen) totalPending += (count - seen);
   });
@@ -2827,7 +2827,7 @@ function updateOglasiBadge() {
 function markOglasiSeen() {
   if (!CU) return;
   LISTINGS.filter(l => l.uid === CU.id && l.status === 'active').forEach(l => {
-    lastSeenPonude[l.id] = parseInt(l._ponuda_count || l.ponuda_count || 0);
+    lastSeenPonude[l.id] = parseInt(l._pending_count || 0);
   });
   const b = document.getElementById('oglasi-badge');
   const bb = document.getElementById('sbn-oglasi-badge');
