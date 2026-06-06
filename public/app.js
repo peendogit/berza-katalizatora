@@ -1124,6 +1124,7 @@ async function renderBuyerZavrseni() {
     const thumbSrc = imgs[0] || null;
     const gallB = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
     const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '🔧';
+    const isPoslato = l.status === 'sent';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px;flex-shrink:0">${thumb}</div>
@@ -1133,13 +1134,19 @@ async function renderBuyerZavrseni() {
         </div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' KM':''}</div>
       </div>
-      <span class="badge b-ok" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">✅ Ponuda prihvaćena</span>
-      <div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:14px">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Katalizator se šalje na vašu adresu</div>
-        <div style="font-size:13px;color:var(--muted2);line-height:2">
-          ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : '<span style="color:var(--muted)">Adresa nije unesena u profilu</span>'}
-        </div>
-      </div>
+      ${isPoslato
+        ? `<span class="badge b-blue" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">📬 Katalizator je poslat!</span>
+           <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:8px;padding:14px;font-size:13px;color:var(--muted2)">
+             Prodavač je označio da je katalizator poslan. Očekujte isporuku uskoro.
+           </div>`
+        : `<span class="badge b-ok" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">✅ Ponuda prihvaćena</span>
+           <div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:14px">
+             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Katalizator se šalje na vašu adresu</div>
+             <div style="font-size:13px;color:var(--muted2);line-height:2">
+               ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : '<span style="color:var(--muted)">Adresa nije unesena u profilu</span>'}
+             </div>
+           </div>`
+      }
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
         <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">${buyerRatedSet.has(l.id) ? '⭐ Ocijenjeno ' + (buyerRatingMap[l.id] ? '★'.repeat(buyerRatingMap[l.id].stars)+'☆'.repeat(5-buyerRatingMap[l.id].stars) : '') : '⭐ Ocijeni prodavača'}</button>
@@ -2841,7 +2848,8 @@ function updateOglasiBadge() {
   let totalPending = 0;
   mine.forEach(l => {
     const count = parseInt(l._pending_count || 0);
-    const seen = lastSeenPonude[l.id] || 0;
+    const seenKey = 'seen_ponude_' + CU.id + '_' + l.id;
+    const seen = parseInt(localStorage.getItem(seenKey) || '0');
     if (count > seen) totalPending += (count - seen);
   });
   const b = document.getElementById('oglasi-badge');
@@ -2853,7 +2861,9 @@ function updateOglasiBadge() {
 function markOglasiSeen() {
   if (!CU) return;
   LISTINGS.filter(l => l.uid === CU.id && l.status === 'active').forEach(l => {
-    lastSeenPonude[l.id] = parseInt(l._pending_count || 0);
+    const count = parseInt(l._pending_count || 0);
+    const seenKey = 'seen_ponude_' + CU.id + '_' + l.id;
+    localStorage.setItem(seenKey, String(count));
   });
   const b = document.getElementById('oglasi-badge');
   const bb = document.getElementById('sbn-oglasi-badge');
