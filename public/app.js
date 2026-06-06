@@ -669,15 +669,15 @@ function buildPonudeList(l) {
     const buyerCity = p.buyerCity || (getU(p.buyerId)||{city:'—'}).city;
     const buyerTel  = p.buyerTel  || (getU(p.buyerId)||{tel:'—'}).tel;
     const col = avCol(String(p.buyerId));
-    const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected';
+    const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected', isExp = p.status==='expired';
     const verB = p.premium ? '<span class="badge b-ok" style="font-size:10px">⭐ Premium</span>' : '';
     const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">🥇 Najbolja</span>':'';
-    const acts = !isAcc&&!isDec ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
+    const acts = !isAcc&&!isDec&&!isExp ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
     const telB = isAcc ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">📞 ${buyerTel||'—'}</div>` : '';
     const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${p.msg}"</div>` : '';
     const bg   = isAcc?'var(--gL)':isDec?'rgba(0,0,0,.15)':'rgba(255,255,255,.03)';
     const bc   = isAcc?'rgba(29,185,84,.2)':isDec?'var(--border)':'var(--border2)';
-    return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${isDec?.5:1}">
+    return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${(isDec||isExp)?.5:1}">
       <div class="ponuda-av" style="background:${col};cursor:pointer" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${initials(buyerName)}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
