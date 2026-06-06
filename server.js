@@ -1335,6 +1335,34 @@ app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
   } catch(err) { res.status(500).json({ error: 'Greška' }); }
 });
 
+// ─── Cron: automatsko istjecanje ponuda ──────────────────
+async function expireOldPonude() {
+  try {
+    const result = await pool.query(`
+      UPDATE ponude SET status = 'expired'
+      WHERE status = 'pending'
+        AND expires_at < NOW()
+      RETURNING id, listing_id, buyer_id
+    `);
+    if (result.rows.length > 0) {
+      console.log(`⏰ Isteklo ${result.rows.length} ponuda`);
+      // Email notifikacija kupcima
+      for (const p of result.rows) {
+        notifyUser(p.buyer_id,
+          '⏰ Vaša ponuda je istekla — Berza Katalizatora',
+          `<p>Vaša ponuda nije prihvaćena u zadatom roku i automatski je istekla.</p>
+           <p>Možete poslati novu ponudu na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
+        ).catch(() => {});
+      }
+    }
+  } catch(e) {
+    console.error('Cron ponude expire error:', e.message);
+  }
+}
+
+expireOldPonude();
+setInterval(expireOldPonude, 10 * 60 * 1000); // svakih 10 minuta
+
 // ─── Cron: automatsko istjecanje oglasa ──────────────────
 // Pokreće se svaki sat, istječe oglase starije od 7 dana bez ponuda
 async function expireOldListings() {
