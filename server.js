@@ -1346,14 +1346,6 @@ async function expireOldPonude() {
     `);
     if (result.rows.length > 0) {
       console.log(`⏰ Isteklo ${result.rows.length} ponuda`);
-      // Email notifikacija kupcima
-      for (const p of result.rows) {
-        notifyUser(p.buyer_id,
-          '⏰ Vaša ponuda je istekla — Berza Katalizatora',
-          `<p>Vaša ponuda nije prihvaćena u zadatom roku i automatski je istekla.</p>
-           <p>Možete poslati novu ponudu na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
-        ).catch(() => {});
-      }
     }
   } catch(e) {
     console.error('Cron ponude expire error:', e.message);
