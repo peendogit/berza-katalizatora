@@ -648,6 +648,7 @@ async function togglePP(lid) {
       id: p.id, buyerId: p.buyer_id, cijena: parseFloat(p.cijena),
       msg: '', time: new Date(p.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'}),
       status: p.status, dani: p.dani,
+      expiresAt: p.expires_at ? new Date(p.expires_at).getTime() : null,
       buyerName: p.buyer_name, buyerCity: p.buyer_city, buyerTel: p.buyer_tel, buyerAddr: p.buyer_addr,
       buyerTx: parseInt(p.buyer_transactions) || 0,
       premium: false
@@ -688,7 +689,7 @@ function buildPonudeList(l) {
           </div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">ističe ${(() => { const rem = Math.ceil((p.expiresAt - Date.now()) / 86400000); return rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'; })()}</span>` : ''}</div>
         ${telB}${msgB}
         ${acts ? `<div style="display:flex;gap:6px;margin-top:8px">${acts}</div>` : ''}
       </div>
@@ -1558,7 +1559,7 @@ function openProfil() {
     <div class="fg">
       <label>Default period važenja ponude</label>
       <select id="p-default-dani">
-        ${[1,2,3,4,5,6,7].map(d=>`<option value="${d}" ${(u.defaultDana||3)===d?'selected':''}>${d} ${d===1?'dan':'dana'}</option>`).join('')}
+        ${[2,3,4,5,6,7].map(d=>`<option value="${d}" ${(u.defaultDana||3)===d?'selected':''}>${d} dana</option>`).join('')}
       </select>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Ovo će biti automatski odabran period kad šalješ ponudu</div>
     </div>` : ''}
