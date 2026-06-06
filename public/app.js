@@ -72,6 +72,16 @@ function incrementBidsToday(uid) {
   dailyBids[uid].count++;
 }
 
+// Sync daily bids count sa serverom
+async function syncBidsToday() {
+  if (!CU || CU.role !== 'buyer' || CU.premium) return;
+  try {
+    const data = await api('GET', '/ponude/count-today');
+    const today = getTodayStr();
+    dailyBids[CU.id] = { date: today, count: parseInt(data.count) || 0 };
+  } catch(e) {}
+}
+
 function canBid() {
   if (!CU || CU.role !== 'buyer') return false;
   if (CU.premium) return true; // premium — neograničeno
@@ -260,6 +270,7 @@ function loginUser(u) {
   expireOld();
   // Provjeri broadcast notifikacije
   if (u.role !== 'admin') checkBroadcasts();
+  if (u.role === 'buyer') syncBidsToday();
   // Header
   document.getElementById('hdr-guest').style.display = 'none';
   const hu = document.getElementById('hdr-user');
@@ -935,9 +946,23 @@ async function renderBuyerListings() {
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
-    const ponudaBtn = moze
-      ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : l.marka+' '+l.model}')">` + oglasBtnLabel + `</button>`
-      : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
+    // Provjeri status moje ponude za ovaj oglas
+    const myP = getMyPonude().find(p => p.lid === l.id);
+    const myStatus = myP ? myP.status : null;
+    let ponudaBtn;
+    if (!moze) {
+      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
+    } else if (myStatus === 'pending') {
+      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.6;cursor:default">⏳ Ponuda poslana</button>`;
+    } else if (myStatus === 'accepted') {
+      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.6;cursor:default">✅ Prihvaćena</button>`;
+    } else if (myStatus === 'rejected') {
+      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default">❌ Odbijena</button>`;
+    } else if (myStatus === 'expired') {
+      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default">⏰ Istekla</button>`;
+    } else {
+      ponudaBtn = `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : l.marka+' '+l.model}')">` + oglasBtnLabel + `</button>`;
+    }
     return `<div class="oglas-card">
       ${thumb}
       <div class="oglas-body">
