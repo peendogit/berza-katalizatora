@@ -330,6 +330,7 @@ app.get('/api/listings', auth, async (req, res) => {
       query = `
         SELECT l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap, 
                l.images, l.status, l.country, l.created_at,
+               l.listing_type, l.lot_items,
                u.name as owner_name, u.city as owner_city, u.tel as owner_tel,
                COUNT(p.id) as ponuda_count,
                COUNT(CASE WHEN p.status = 'pending' THEN 1 END) as pending_count
@@ -338,7 +339,8 @@ app.get('/api/listings', auth, async (req, res) => {
         LEFT JOIN ponude p ON p.listing_id = l.id
         WHERE l.user_id = $1::integer
         GROUP BY l.id, l.user_id, l.broj, l.marka, l.model, l.god, l.stanje, l.nap,
-                 l.images, l.status, l.country, l.created_at, u.name, u.city, u.tel
+                 l.images, l.status, l.country, l.created_at, l.listing_type, l.lot_items,
+                 u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [parseInt(req.user.id)];
       const debugResult = await pool.query(query, params);
@@ -593,6 +595,18 @@ app.put('/api/listings/:id/status', auth, async (req, res) => {
 // PONUDE ROUTES
 // ═══════════════════════════════════════════════════════════
 
+// GET /api/ponude/count-today — koliko ponuda je buyer poslao danas
+app.get('/api/ponude/count-today', auth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM ponude WHERE buyer_id = $1 AND DATE(created_at) = $2 AND status != 'expired'`,
+      [req.user.id, today]
+    );
+    res.json({ count: parseInt(result.rows[0].count) || 0 });
+  } catch(err) { res.status(500).json({ error: 'Greška' }); }
+});
+
 // POST /api/ponude  (buyer šalje ponudu)
 app.post('/api/ponude', auth, async (req, res) => {
   try {
@@ -604,11 +618,11 @@ app.post('/api/ponude', auth, async (req, res) => {
       return res.status(403).json({ error: 'Vaš nalog nije odobren' });
     }
 
-    // Daily limit za free korisnike
+    // Daily limit za free korisnike - broji samo today's ponude bez expired
     if (!user.rows[0].premium) {
       const today = new Date().toISOString().split('T')[0];
       const count = await pool.query(
-        `SELECT COUNT(*) FROM ponude WHERE buyer_id = $1 AND DATE(created_at) = $2`,
+        `SELECT COUNT(*) FROM ponude WHERE buyer_id = $1 AND DATE(created_at) = $2 AND status != 'expired'`,
         [req.user.id, today]
       );
       if (parseInt(count.rows[0].count) >= 10) {
@@ -644,13 +658,10 @@ app.post('/api/ponude', auth, async (req, res) => {
         return res.status(400).json({ error: 'Već imate aktivnu ponudu za ovaj oglas' });
       }
       if (ex.status === 'rejected') {
-        const attempts = ex.attempt_count || 1;
-        if (attempts >= 2) {
-          return res.status(400).json({ error: 'Iskoristili ste sve pokušaje za ovaj oglas' });
-        }
-        if (parseFloat(cijena) <= parseFloat(ex.cijena)) {
-          return res.status(400).json({ error: 'Nova ponuda mora biti veća od prethodne (' + ex.cijena + ' KM)' });
-        }
+        return res.status(400).json({ error: 'Vaša ponuda je odbijena. Ne možete ponovo ponuditi za ovaj oglas.' });
+      }
+      if (ex.status === 'expired') {
+        return res.status(400).json({ error: 'Vaša ponuda je istekla. Ne možete ponovo ponuditi za ovaj oglas.' });
       }
     }
 
@@ -662,7 +673,7 @@ app.post('/api/ponude', auth, async (req, res) => {
        ON CONFLICT (listing_id, buyer_id) DO UPDATE
          SET cijena = $3, dani = $4, expires_at = $5, status = 'pending', created_at = NOW(),
              attempt_count = COALESCE(ponude.attempt_count, 1) + 1
-       WHERE ponude.status = 'rejected'
+       WHERE ponude.status IN ('rejected', 'expired')
        RETURNING *`,
       [listing_id, req.user.id, cijena, dani, expires_at]
     );
