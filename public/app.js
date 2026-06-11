@@ -102,12 +102,34 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => String(u.id) === String(id));
-const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: l.owner_name||'Nepoznat', city: l.owner_city||'—', tel: l.owner_tel||'—' });
+const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: escapeHtml(l.owner_name)||'Nepoznat', city: escapeHtml(l.owner_city)||'—', tel: escapeHtml(l.owner_tel)||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
 const avCol    = id => { const s = String(id||'x'); return avColors[s.charCodeAt(s.length-1) % avColors.length]; };
 const now8     = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'. '+(d.getMonth()+1).toString().padStart(2,'0')+'. '+d.getFullYear()+'.'; };
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+// Za ubacivanje teksta unutar JS string literala u onclick="..." atributima.
+// Escapuje i HTML i JS-specijalne znakove (', \, newline) da spriječi injection.
+function jsAttr(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, '');
+}
 
 // ═══════════════════════════════════════════════════════
 // PAGE NAVIGATION
@@ -528,10 +550,8 @@ async function submitListing() {
 // EXPIRE
 // ═══════════════════════════════════════════════════════
 function expireOld() {
-  const WEEK = 7*86400000;
-  LISTINGS.forEach(l => {
-    if (l.status==='active' && !l.ponude.length && (Date.now()-l.createdAt) > WEEK) l.status='expired';
-  });
+  // Status 'expired' sad upravlja isključivo server (cron expireOldListings).
+  // Lokalna logika uklonjena da ne override-uje server status.
   // Provjeri istek verified
   USERS.forEach(u => {
     if (u.premium && u.premiumUntil && Date.now() > u.premiumUntil) {
@@ -589,7 +609,7 @@ async function renderMyListings() {
           <div class="s-oglas-title">${
             l.listing_type === 'lot'
               ? `<span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:4px">LOT</span>📦 ${Array.isArray(l.lot_items)?l.lot_items.length:0} katalizatora`
-              : `${l.marka} ${l.model}${l.god?' ('+l.god+')':''}`
+              : `${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}`
           }</div>
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
@@ -619,7 +639,7 @@ async function renderMyListings() {
           <div class="s-oglas-body">
             <div class="s-oglas-thumb">${thumb}</div>
             <div style="flex:1">
-              <div class="s-oglas-title" style="color:var(--muted)">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+              <div class="s-oglas-title" style="color:var(--muted)">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
               <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
               <div class="s-oglas-meta">📅 ${fmtDate(l.createdAt)} &nbsp;·&nbsp; <span style="color:var(--red)">Isteklo bez ponuda</span></div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -670,7 +690,7 @@ async function togglePP(lid) {
       msg: '', time: new Date(p.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'}),
       status: p.status, dani: p.dani,
       expiresAt: p.expires_at ? new Date(p.expires_at).getTime() : null,
-      buyerName: p.buyer_name, buyerCity: p.buyer_city, buyerTel: p.buyer_tel, buyerAddr: p.buyer_addr,
+      buyerName: escapeHtml(p.buyer_name), buyerCity: escapeHtml(p.buyer_city), buyerTel: escapeHtml(p.buyer_tel), buyerAddr: escapeHtml(p.buyer_addr),
       buyerTx: parseInt(p.buyer_transactions) || 0,
       premium: false
     }));
@@ -688,16 +708,16 @@ function buildPonudeList(l) {
   const sorted = [...l.ponude].sort((a,b) => b.cijena-a.cijena);
   if (!sorted.length) return '<div style="font-size:13px;color:var(--muted);padding:8px">Nema ponuda</div>';
   return sorted.map((p,i) => {
-    const buyerName = p.buyerName || (getU(p.buyerId)||{name:'Otkupljivač'}).name;
-    const buyerCity = p.buyerCity || (getU(p.buyerId)||{city:'—'}).city;
-    const buyerTel  = p.buyerTel  || (getU(p.buyerId)||{tel:'—'}).tel;
+    const buyerName = p.buyerName || escapeHtml((getU(p.buyerId)||{name:'Otkupljivač'}).name);
+    const buyerCity = p.buyerCity || escapeHtml((getU(p.buyerId)||{city:'—'}).city);
+    const buyerTel  = p.buyerTel  || escapeHtml((getU(p.buyerId)||{tel:'—'}).tel);
     const col = avCol(String(p.buyerId));
     const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected', isExp = p.status==='expired';
     const verB = p.premium ? '<span class="badge b-ok" style="font-size:10px">⭐ Premium</span>' : '';
     const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">🥇 Najbolja</span>':'';
     const acts = !isAcc&&!isDec&&!isExp ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
     const telB = isAcc ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">📞 ${buyerTel||'—'}</div>` : '';
-    const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${p.msg}"</div>` : '';
+    const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${escapeHtml(p.msg)}"</div>` : '';
     const bg   = isAcc?'var(--gL)':isDec?'rgba(0,0,0,.15)':'rgba(255,255,255,.03)';
     const bc   = isAcc?'rgba(29,185,84,.2)':isDec?'var(--border)':'var(--border2)';
     return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${(isDec||isExp)?.5:1}">
@@ -802,7 +822,7 @@ async function renderZavrseni() {
   const hasMore = sorted.length > paginated.length;
   el.innerHTML = paginated.map(l => {
     const acc   = l.ponude.find(p => p.status === 'accepted');
-    const buyer = acc ? { name: acc.buyer_name||'Kupac', city: acc.buyer_city||'—', tel: acc.buyer_tel||'—' } : null;
+    const buyer = acc ? { name: escapeHtml(acc.buyer_name)||"Kupac", city: escapeHtml(acc.buyer_city)||"—", tel: escapeHtml(acc.buyer_tel)||"—" } : null;
     const addr  = acc ? getBuyerAddr(acc) : null;
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
@@ -811,13 +831,13 @@ async function renderZavrseni() {
     const isPoslato = poslatoSet.has(l.id);
     const isOpen = !isPoslato; // poslato su zatvorene, ostale otvorene
 
-    const rateBtn = buyer && acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${l.marka} ${l.model}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : '';
+    const rateBtn = buyer && acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${jsAttr(l.marka+' '+l.model)}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : '';
 
     return `<div class="zav-card${isPoslato?' poslato':''}${isOpen?' open':''}" id="zav-${l.id}">
       <div class="zav-header" onclick="toggleZav(${l.id})">
         <div class="s-oglas-thumb" style="width:52px;height:52px;font-size:20px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
           <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' KM':''}</div>
         </div>
         ${isPoslato ? '<span class="badge b-ok" style="flex-shrink:0">✅ Poslato</span>' : '<span class="badge b-wait" style="flex-shrink:0">📦 Za slanje</span>'}
@@ -972,7 +992,7 @@ async function renderBuyerListings() {
     } else if (myStatus === 'expired') {
       ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default">⏰ Istekla</button>`;
     } else {
-      ponudaBtn = `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : l.marka+' '+l.model}')">` + oglasBtnLabel + `</button>`;
+      ponudaBtn = `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : jsAttr(l.marka+' '+l.model)}')">` + oglasBtnLabel + `</button>`;
     }
     return `<div class="oglas-card">
       ${thumb}
@@ -983,20 +1003,20 @@ async function renderBuyerListings() {
                📦 ${lotCount} katalizatora
                <span style="font-size:11px;color:var(--orange);margin-left:4px">▸ detalji</span>
              </div>`
-          : `<div class="oglas-title">${l.marka} ${l.model}${l.god ? ' (' + l.god + ')' : ''}</div>`
+          : `<div class="oglas-title">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god ? ' (' + escapeHtml(String(l.god)) + ')' : ''}</div>`
         }
         <div class="oglas-badges">
-          ${!isLot && l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
+          ${!isLot && l.broj ? `<span class="badge b-blue">Nr. ${escapeHtml(l.broj)}</span>` : ''}
           ${!isLot ? `<span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>` : ''}
           ${isLot && lotPreview ? `<span style="font-size:11px;color:var(--muted2);cursor:pointer" onclick="event.stopPropagation();openLotDetail(${l.id})">OEM: ${lotPreview}</span>` : ''}
           ${expW}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
-        ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
+        ${l.nap ? `<div class="oglas-nap">${escapeHtml(l.nap)}</div>` : ''}
         <div class="oglas-footer">
           <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
           <div class="oglas-actions">
-            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${isLot?'Lot '+lotCount+' kom':l.marka+' '+l.model}')">💬 Poruka</button>
+            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${isLot?'Lot '+lotCount+' kom':jsAttr(l.marka+' '+l.model)}')">💬 Poruka</button>
             ${ponudaBtn}
           </div>
         </div>
@@ -1140,7 +1160,7 @@ async function renderBuyerZavrseni() {
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
           <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}📍 ${seller.city}</div>
         </div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' KM':''}</div>
@@ -1160,7 +1180,7 @@ async function renderBuyerZavrseni() {
       }
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
-        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${l.marka} ${l.model}',this)">${buyerRatedSet.has(l.id) ? '⭐ Ocijenjeno ' + (buyerRatingMap[l.id] ? '★'.repeat(buyerRatingMap[l.id].stars)+'☆'.repeat(5-buyerRatingMap[l.id].stars) : '') : '⭐ Ocijeni prodavača'}</button>
+        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${jsAttr(l.marka+' '+l.model)}',this)">${buyerRatedSet.has(l.id) ? '⭐ Ocijenjeno ' + (buyerRatingMap[l.id] ? '★'.repeat(buyerRatingMap[l.id].stars)+'☆'.repeat(5-buyerRatingMap[l.id].stars) : '') : '⭐ Ocijeni prodavača'}</button>
       </div>
     </div>`;
   }).join('');
@@ -1183,11 +1203,11 @@ function renderMyPonude() {
   const hasMore = sortedPonude.length > paginated.length;
   el.innerHTML = paginated.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
-    const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
+    const p = l.ponude.find(x => x.id === mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
-    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : 'var(--yellow)';
-    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : '⏳ Na čekanju';
+    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : status==='expired' ? 'var(--muted)' : 'var(--yellow)';
+    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : status==='expired' ? '⏰ Istekla' : '⏳ Na čekanju';
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
@@ -1197,7 +1217,7 @@ function renderMyPonude() {
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
       ${thumb}
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+        <div style="font-size:13px;font-weight:700">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
         <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
@@ -1275,8 +1295,8 @@ function renderChatMsgs() {
     const avColor = isMe ? avCol(CU.id) : avCol(theirId);
     const avText  = isMe ? initials(CU.name) : initials(theirName||'?');
     const content = m.imgUrl
-      ? `<img class="bubble-img" src="${m.imgUrl}" onclick="openLightbox('${m.imgUrl}')">`
-      : m.msg.split('\n').join('<br>');
+      ? `<img class="bubble-img" src="${escapeHtml(m.imgUrl)}" onclick="openLightbox('${jsAttr(m.imgUrl)}')">`
+      : escapeHtml(m.msg).split('\n').join('<br>');
     return `<div class="bubble-wrap ${isMe?'me':''}">
       ${!isMe?`<div class="bubble-av" style="background:${avColor};${showAv?'':'opacity:0;pointer-events:none'}">${avText}</div>`:''}
       <div class="bubble ${isMe?'me':'them'}">${content}<span class="bubble-time">${m.time}</span></div>
@@ -1583,8 +1603,8 @@ function openProfil() {
   document.getElementById('profil-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div style="width:48px;height:48px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;color:#fff">${initials(u.name)}</div>
-      <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${u.name}</div>
-      <div style="font-size:12px;color:var(--muted2);margin-top:2px">${u.email} · ${roleLabel} ${stB} ${vB}</div></div>
+      <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${escapeHtml(u.name)}</div>
+      <div style="font-size:12px;color:var(--muted2);margin-top:2px">${escapeHtml(u.email)} · ${roleLabel} ${stB} ${vB}</div></div>
     </div>
     <div class="divider"></div>
     <div class="row2">
@@ -1761,8 +1781,8 @@ function adminCard(u) {
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
       <div class="admin-av" style="background:${col};width:32px;height:32px;font-size:12px;flex-shrink:0">${initials(u.name)}</div>
       <div style="min-width:0;flex:1">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${pB}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.fullname ? `<span style="color:var(--muted2)">${u.fullname}</span> · ` : ''}${u.email} · ${u.city||'—'} · ${u.tel||'—'}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">${escapeHtml(u.name)} ${rB} ${sB} ${pB}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.fullname ? `<span style="color:var(--muted2)">${escapeHtml(u.fullname)}</span> · ` : ''}${escapeHtml(u.email)} · ${escapeHtml(u.city)||'—'} · ${escapeHtml(u.tel)||'—'}</div>
       </div>
     </div>
     <div style="flex-shrink:0;margin-left:6px">
@@ -1859,7 +1879,7 @@ async function toggleUserDetail(uid) {
 
   let h=`<div style="padding:4px 0">`;
   h+=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">
-    ${u.fullname ? `<span style="color:var(--text);font-weight:600">${u.fullname}</span> &nbsp;·&nbsp; ` : ''}
+    ${u.fullname ? `<span style="color:var(--text);font-weight:600">${escapeHtml(u.fullname)}</span> &nbsp;·&nbsp; ` : ''}
     ${u.entity === 'firma' ? '🏢 Firma &nbsp;·&nbsp; ' : u.entity === 'fizicko' ? '👤 Fizičko lice &nbsp;·&nbsp; ' : ''}
     Registrovan: ${fmtDate(new Date(u.created_at).getTime())}
     ${u.premium && u.premiumUntil ? ` &nbsp;·&nbsp; <span style="color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</span>` : ''}
@@ -1875,7 +1895,7 @@ async function toggleUserDetail(uid) {
       const soldDate = l.sold_at ? ' · Prodano: '+fmtDate(new Date(l.sold_at).getTime()) : '';
       return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
         <div style="min-width:0;flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
           <div style="font-size:11px;color:var(--muted)">Dodano: ${fmtDate(new Date(l.created_at).getTime())}${soldDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
@@ -1957,12 +1977,12 @@ async function admViewChat(lid, uid) {
       const time = new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'});
       const dateStr = new Date(m.created_at).toLocaleDateString('bs');
       const txt = m.image_url
-        ? `<img class="bubble-img" src="${m.image_url}" onclick="openLightbox('${m.image_url}')" style="cursor:zoom-in">`
-        : (m.text||'').split('\n').join('<br>');
+        ? `<img class="bubble-img" src="${escapeHtml(m.image_url)}" onclick="openLightbox('${jsAttr(m.image_url)}')" style="cursor:zoom-in">`
+        : escapeHtml(m.text||'').split('\n').join('<br>');
       return `<div class="bubble-wrap ${isOwner?'me':''}">
         ${!isOwner?`<div class="bubble-av" style="background:#8e44ad">${initials(m.sender_name||'?')}</div>`:''}
         <div class="bubble ${isOwner?'me':'them'}">
-          <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px">${m.sender_name||'?'} · ${dateStr}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px">${escapeHtml(m.sender_name)||'?'} · ${dateStr}</div>
           ${txt}<span class="bubble-time">${time}</span>
         </div>
       </div>`;
@@ -2153,7 +2173,7 @@ async function admToggleOglas(id) {
             const badge = isAcc ? '✅' : isRej ? '❌' : '⏳';
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
               <span style="font-size:12px">${badge}</span>
-              <span style="flex:1;font-size:12px;color:var(--text)">${p.buyer_name} <span style="color:var(--muted)">(${p.buyer_city||'—'})</span></span>
+              <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
               <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
               <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
             </div>`;
@@ -2189,7 +2209,7 @@ async function renderAdminOglasi() {
         <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'🪙')}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
-            ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${l.marka} ${l.model}${l.god?' ('+l.god+')':''}
+            ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}
           </div>
           <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px;${stStyle}">${stLabel}</span></div>
         </div>
@@ -2198,12 +2218,12 @@ async function renderAdminOglasi() {
       <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2)">
         ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>`'${x}'`).join(',')}])">`).join('')}</div>` : ''; })()}
         <div style="font-size:12px;line-height:2">
-          ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
+          ${l.broj?`<b>OEM br.:</b> ${escapeHtml(l.broj)}<br>`:''}
           ${!isLot?`<b>Stanje:</b> ${l.stanje||'—'}<br>`:''}
           <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
-          ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${l.accepted_buyer_name} (${l.accepted_buyer_city||'—'})<br>` : ''}
+          ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${escapeHtml(l.accepted_buyer_name)} (${escapeHtml(l.accepted_buyer_city)||"—"})<br>` : ''}
           ${l.sold_at ? `<b>Prodano:</b> ${new Date(l.sold_at).toLocaleDateString('bs')}<br>` : ''}
-          ${l.nap?`<b>Napomena:</b> ${l.nap}<br>`:''}
+          ${l.nap?`<b>Napomena:</b> ${escapeHtml(l.nap)}<br>`:''}
           <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}
         </div>
         ${parseInt(l.ponuda_count) > 0 ? `
@@ -2394,8 +2414,8 @@ async function renderPoruke() {
     return `<div class="inbox-item ${unread?'unread':''}" id="ii-${c.lid}" onclick="openSellerChat(${c.lid})">
       <div class="inbox-av" style="background:${buyerCol}">${buyerInit}</div>
       <div style="flex:1;min-width:0">
-        <div class="inbox-name">${buyerName}</div>
-        <div class="inbox-preview">${c.listing.marka} ${c.listing.model} · "${preview}"</div>
+        <div class="inbox-name">${escapeHtml(buyerName)}</div>
+        <div class="inbox-preview">${escapeHtml(c.listing.marka)} ${escapeHtml(c.listing.model)} · "${escapeHtml(preview)}"</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="inbox-time">${last.time}</div>
@@ -2535,11 +2555,11 @@ async function renderBuyerPoruke() {
     const preview = last.msg.length > 50 ? last.msg.slice(0,50)+'...' : last.msg;
     const isMyLast = last.senderId === CU.id;
     const unread = hasUnread(c.lid);
-    return `<div class="inbox-item ${unread?'unread':''}" id="bi-${c.lid}" onclick="openChat(${c.lid},'${c.listing.marka} ${c.listing.model}')">
+    return `<div class="inbox-item ${unread?'unread':''}" id="bi-${c.lid}" onclick="openChat(${c.lid},'${jsAttr(c.listing.marka+' '+c.listing.model)}')">
       <div class="inbox-av" style="background:${avCol(seller.id||'x')}">${initials(seller.name)}</div>
       <div style="flex:1;min-width:0">
         <div class="inbox-name">${seller.name}</div>
-        <div class="inbox-preview">${c.listing.marka} ${c.listing.model} · ${isMyLast?'Ti: ':''}${preview}</div>
+        <div class="inbox-preview">${escapeHtml(c.listing.marka)} ${escapeHtml(c.listing.model)} · ${isMyLast?'Ti: ':''}${escapeHtml(preview)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="inbox-time">${last.time}</div>
@@ -2911,7 +2931,7 @@ function openLotDetail(lid) {
           : `<span style="color:var(--muted);font-size:11px">— Nepoznato</span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)">
       <span style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;flex-shrink:0">${i+1}</span>
-      <span style="flex:1;font-size:14px;color:${it.broj?'#fff':'#666'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400};letter-spacing:.3px">${it.broj || '— bez OEM broja'}</span>
+      <span style="flex:1;font-size:14px;color:${it.broj?'#fff':'#666'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400};letter-spacing:.3px">${escapeHtml(it.broj) || '— bez OEM broja'}</span>
       ${stBadge}
     </div>`;
   }).join('');
@@ -2924,7 +2944,7 @@ function openLotDetail(lid) {
         </div>
         <button onclick="document.getElementById('ov-lot-detail').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1">✕</button>
       </div>
-      ${l.nap ? `<div style="font-size:12px;color:var(--muted2);background:rgba(255,255,255,.04);border-radius:6px;padding:8px 10px;margin-bottom:12px">📝 ${l.nap}</div>` : ''}
+      ${l.nap ? `<div style="font-size:12px;color:var(--muted2);background:rgba(255,255,255,.04);border-radius:6px;padding:8px 10px;margin-bottom:12px">📝 ${escapeHtml(l.nap)}</div>` : ''}
       <div style="max-height:55vh;overflow-y:auto">${rows}</div>
       <div style="margin-top:14px;display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" style="flex:1" onclick="document.getElementById('ov-lot-detail').remove()">Zatvori</button>
