@@ -1383,6 +1383,29 @@ let _metalPrices = {
   updated: null
 };
 
+// Scraping rodijuma sa kitco.com (USD/oz, konvertujemo u EUR preko Pt cijene kao referentni kurs)
+async function fetchRhodiumPrice() {
+  try {
+    const res = await fetch('https://www.kitco.com/price/precious-metals', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
+    });
+    const html = await res.text();
+    // Traži rodijum cijenu u USD - format se mijenja, probamo nekoliko pattern-a
+    let match = html.match(/Rhodium[\s\S]{0,500}?(\d{1,2}[,.]?\d{3}\.\d{2})/i);
+    if (!match) {
+      // Alternativni pattern - data atribut
+      match = html.match(/rhodium["'\s:]+(\d{1,2}[,.]?\d{3}(?:\.\d+)?)/i);
+    }
+    if (!match) return null;
+    const usdPrice = parseFloat(match[1].replace(',', ''));
+    if (!usdPrice || usdPrice < 100 || usdPrice > 50000) return null; // sanity check
+    return usdPrice;
+  } catch(e) {
+    console.error('Rhodium scrape error:', e.message);
+    return null;
+  }
+}
+
 async function fetchMetalPrices() {
   if (!process.env.GOLDAPI_KEY) {
     console.log('ℹ️  GOLDAPI_KEY nije podešen — metal prices isključeni');
@@ -1406,22 +1429,32 @@ async function fetchMetalPrices() {
     }
 
     const headers = { 'x-access-token': process.env.GOLDAPI_KEY };
-    const [ptRes, pdRes] = await Promise.all([
+    const [ptRes, pdRes, ptUsdRes] = await Promise.all([
       fetch('https://www.goldapi.io/api/XPT/EUR', { headers }),
-      fetch('https://www.goldapi.io/api/XPD/EUR', { headers })
+      fetch('https://www.goldapi.io/api/XPD/EUR', { headers }),
+      fetch('https://www.goldapi.io/api/XPT/USD', { headers })
     ]);
     const pt = await ptRes.json();
     const pd = await pdRes.json();
+    const ptUsd = await ptUsdRes.json();
 
     if (pt.error || pd.error) {
       console.error('Metal prices API error:', pt.error || pd.error);
       return;
     }
 
+    // Rodijum - scrape sa kitco.com (USD), konvertuj u EUR preko Pt EUR/USD kursa
+    let rhodiumEur = null;
+    if (ptUsd.price && pt.price) {
+      const usdToEurRate = pt.price / ptUsd.price; // npr. 0.92
+      const rhodiumUsd = await fetchRhodiumPrice();
+      if (rhodiumUsd) rhodiumEur = Math.round(rhodiumUsd * usdToEurRate);
+    }
+
     const newPrices = {
       platinum: pt.price ? Math.round(pt.price) : null,
       palladium: pd.price ? Math.round(pd.price) : null,
-      rhodium: null
+      rhodium: rhodiumEur
     };
 
     const prevPlatinum = row ? row.platinum : null;
