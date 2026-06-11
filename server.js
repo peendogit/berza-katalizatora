@@ -1266,9 +1266,30 @@ app.get('/api/admin/listings/:id/ponude', auth, adminOnly, async (req, res) => {
   }
 });
 
-// ─── SPA fallback ─────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// GET /api/metal-prices
+app.get('/api/metal-prices', auth, (req, res) => {
+  if (!_metalPrices.updated) {
+    return res.json({ available: false });
+  }
+  function trend(curr, prev) {
+    if (prev === null || curr === null) return 'flat';
+    const diff = ((curr - prev) / prev) * 100;
+    if (diff > 1) return 'up';
+    if (diff < -1) return 'down';
+    return 'flat';
+  }
+  res.json({
+    available: true,
+    platinum: _metalPrices.platinum,
+    palladium: _metalPrices.palladium,
+    rhodium: _metalPrices.rhodium,
+    trends: {
+      platinum: trend(_metalPrices.platinum, _metalPrices.prev.platinum),
+      palladium: trend(_metalPrices.palladium, _metalPrices.prev.palladium),
+      rhodium: trend(_metalPrices.rhodium, _metalPrices.prev.rhodium)
+    },
+    updated: _metalPrices.updated
+  });
 });
 
 // ─── DB migration ────────────────────────────────────────
@@ -1429,33 +1450,6 @@ async function fetchMetalPrices() {
 
 fetchMetalPrices();
 
-// GET /api/metal-prices
-app.get('/api/metal-prices', auth, (req, res) => {
-  console.log('📊 /api/metal-prices pozvan, _metalPrices.updated =', _metalPrices.updated);
-  if (!_metalPrices.updated) {
-    return res.json({ available: false });
-  }
-  function trend(curr, prev) {
-    if (prev === null || curr === null) return 'flat';
-    const diff = ((curr - prev) / prev) * 100;
-    if (diff > 1) return 'up';
-    if (diff < -1) return 'down';
-    return 'flat';
-  }
-  res.json({
-    available: true,
-    platinum: _metalPrices.platinum,
-    palladium: _metalPrices.palladium,
-    rhodium: _metalPrices.rhodium,
-    trends: {
-      platinum: trend(_metalPrices.platinum, _metalPrices.prev.platinum),
-      palladium: trend(_metalPrices.palladium, _metalPrices.prev.palladium),
-      rhodium: trend(_metalPrices.rhodium, _metalPrices.prev.rhodium)
-    },
-    updated: _metalPrices.updated
-  });
-});
-
 // ─── Cron: automatsko istjecanje ponuda ──────────────────
 async function expireOldPonude() {
   try {
@@ -1506,6 +1500,11 @@ async function expireOldListings() {
 // Pokreni odmah pri startu, pa svakih sat vremena
 expireOldListings();
 setInterval(expireOldListings, 60 * 60 * 1000);
+
+// ─── SPA fallback (mora biti POSLIJE svih /api ruta) ─────
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // ─── Start ────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
