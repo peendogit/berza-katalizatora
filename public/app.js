@@ -632,7 +632,7 @@ async function renderMyListings() {
       }).join('')}
     </div>` : '';
 
-  el.innerHTML = activeHtml + expiredHtml;
+  el.innerHTML = await renderMetalWidget() + activeHtml + expiredHtml;
 }
 
 async function reactivateListing(lid) {
@@ -928,12 +928,13 @@ async function renderBuyerListings() {
     }
   }
   const postarina = `<div class="postarina-bar">ℹ️ <b>Napomena:</b> Otkupljivač snosi sve troškove poštarine i transporta.</div>`;
+  const metalWidget = await renderMetalWidget();
   const moze = canBid();
   const PG = 20;
   const pg = window._buyerOglasiPage || 0;
   const paginated = active.slice(0, (pg + 1) * PG);
   const hasMore = active.length > paginated.length;
-  el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + paginated.map(l => {
+  el.innerHTML = limitBar + metalWidget + postarina + `<div class="oglas-list">` + paginated.map(l => {
     const seller = getOwner(l);
     const isLot = l.listing_type === 'lot';
     const lotItems = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
@@ -3049,6 +3050,44 @@ async function _submitRating(toUserId, listingId) {
     toast('❌ ' + err.message, 'err');
     if (btn) { btn.disabled = false; btn.textContent = 'Ocijeni'; }
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// CIJENE PLEMENITIH METALA (widget)
+// ═══════════════════════════════════════════════════════
+let _metalCache = null;
+let _metalCacheTime = 0;
+
+async function fetchMetalPrices() {
+  const now = Date.now();
+  if (_metalCache && (now - _metalCacheTime) < 6 * 60 * 60 * 1000) return _metalCache; // 6h cache
+  try {
+    const data = await api('GET', '/metal-prices');
+    _metalCache = data;
+    _metalCacheTime = now;
+    return data;
+  } catch(e) {
+    return { available: false };
+  }
+}
+
+async function renderMetalWidget() {
+  const data = await fetchMetalPrices();
+  if (!data.available) return '';
+
+  const trendIcon = t => t === 'up' ? '<span style="color:var(--green)">▲</span>' : t === 'down' ? '<span style="color:var(--red)">▼</span>' : '<span style="color:var(--muted)">▬</span>';
+  const fmt = v => v ? v.toLocaleString('de-DE') : '—';
+
+  return `<div style="background:linear-gradient(135deg,rgba(244,196,48,.06),rgba(255,94,20,.04));border:1px solid rgba(244,196,48,.15);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:10px">
+      💹 Cijene metala (€/oz)
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <div><span style="color:var(--muted)">Pt</span> <b style="color:var(--text)">${fmt(data.platinum)}</b> ${trendIcon(data.trends?.platinum)}</div>
+      <div><span style="color:var(--muted)">Pd</span> <b style="color:var(--text)">${fmt(data.palladium)}</b> ${trendIcon(data.trends?.palladium)}</div>
+      ${data.rhodium ? `<div><span style="color:var(--muted)">Rh</span> <b style="color:var(--text)">${fmt(data.rhodium)}</b> ${trendIcon(data.trends?.rhodium)}</div>` : ''}
+    </div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
