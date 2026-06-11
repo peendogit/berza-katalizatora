@@ -1431,6 +1431,7 @@ fetchMetalPrices();
 
 // GET /api/metal-prices
 app.get('/api/metal-prices', auth, (req, res) => {
+  console.log('📊 /api/metal-prices pozvan, _metalPrices.updated =', _metalPrices.updated);
   if (!_metalPrices.updated) {
     return res.json({ available: false });
   }
