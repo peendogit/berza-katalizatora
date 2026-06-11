@@ -932,7 +932,7 @@ async function renderBuyerListings() {
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
+    el.innerHTML = await renderMetalWidget() + `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
     return;
   }
   // Limit bar
