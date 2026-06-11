@@ -1206,8 +1206,8 @@ function renderMyPonude() {
     const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
-    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : 'var(--yellow)';
-    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : '⏳ Na čekanju';
+    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : status==='expired' ? 'var(--muted)' : 'var(--yellow)';
+    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : status==='expired' ? '⏰ Istekla' : '⏳ Na čekanju';
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
