@@ -190,6 +190,11 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(409).json({ error: 'Email već postoji' });
     }
 
+    const nameExists = await pool.query('SELECT id FROM users WHERE LOWER(name) = LOWER($1)', [name.trim()]);
+    if (nameExists.rows.length > 0) {
+      return res.status(409).json({ error: entity === 'firma' ? 'Naziv firme je već zauzet' : 'Korisničko ime je već zauzeto' });
+    }
+
     const hash = await bcrypt.hash(password, 10);
     const status = 'pending'; // svi novi korisnici čekaju odobrenje
 
@@ -1353,6 +1358,12 @@ app.get('/api/metal-prices', auth, async (req, res) => {
         updated_at TIMESTAMPTZ
       )
     `);
+
+    // Unikatnost korisničkog imena/naziva firme (case-insensitive)
+    // Napomena: ako postoje duplikati iz prošlosti, ovo će tiho failati - normalno je
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_lower ON users (LOWER(name))
+    `).catch(e => console.log('ℹ️ Unique index na name preskočen (možda postoje duplikati):', e.message));
 
     console.log('✅ DB migration OK');
   } catch(e) { console.error('Migration error:', e.message); }
