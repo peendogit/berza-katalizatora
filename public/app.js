@@ -1608,10 +1608,10 @@ function openProfil() {
     </div>
     <div class="divider"></div>
     <div class="row2">
-      <div class="fg"><label>Ime / Naziv</label><input id="p-name" value="${u.name||''}"></div>
+      <div class="fg"><label>${u.entity==='firma'?'Naziv firme':'Korisničko ime'} <span style="color:var(--muted);font-weight:400">(ne može se mijenjati)</span></label><input value="${escapeHtml(u.name)||''}" disabled style="opacity:.6;cursor:not-allowed"></div>
       <div class="fg"><label>Grad</label>
         <div class="ac-wrap">
-          <input id="p-city" value="${u.city||''}" placeholder="Upiši grad..." autocomplete="off">
+          <input id="p-city" value="${escapeHtml(u.city)||''}" placeholder="Upiši grad..." autocomplete="off">
           <div class="ac-list" id="ac-p-city"></div>
         </div>
       </div>
@@ -1658,7 +1658,6 @@ function openProfil() {
   }, 50);
 }
 function saveProfile() {
-  CU.name=document.getElementById('p-name').value.trim()||CU.name;
   CU.city=document.getElementById('p-city').value.trim();
   CU.addr=document.getElementById('p-addr').value.trim();
   CU.tel =document.getElementById('p-tel').value.trim();
