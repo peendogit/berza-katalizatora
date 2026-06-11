@@ -1318,6 +1318,15 @@ app.get('*', (req, res) => {
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS listing_type VARCHAR(10) DEFAULT 'single'`);
     await pool.query(`ALTER TABLE listings ADD COLUMN IF NOT EXISTS lot_items JSONB DEFAULT '[]'`);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS metal_prices_cache (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        platinum INTEGER, palladium INTEGER, rhodium INTEGER,
+        prev_platinum INTEGER, prev_palladium INTEGER, prev_rhodium INTEGER,
+        updated_at TIMESTAMPTZ
+      )
+    `);
+
     console.log('✅ DB migration OK');
   } catch(e) { console.error('Migration error:', e.message); }
 })();
@@ -1359,6 +1368,22 @@ async function fetchMetalPrices() {
     return;
   }
   try {
+    // Provjeri DB cache prvo
+    const cached = await pool.query('SELECT * FROM metal_prices_cache WHERE id = 1');
+    const row = cached.rows[0];
+    if (row && row.updated_at) {
+      const ageMs = Date.now() - new Date(row.updated_at).getTime();
+      if (ageMs < 20 * 60 * 60 * 1000) {
+        // Cache je svjež (< 20h) — učitaj u memoriju i preskoči API poziv
+        _metalPrices.platinum = row.platinum;
+        _metalPrices.palladium = row.palladium;
+        _metalPrices.rhodium = row.rhodium;
+        _metalPrices.prev = { platinum: row.prev_platinum, palladium: row.prev_palladium, rhodium: row.prev_rhodium };
+        _metalPrices.updated = row.updated_at;
+        return;
+      }
+    }
+
     const headers = { 'x-access-token': process.env.GOLDAPI_KEY };
     const [ptRes, pdRes] = await Promise.all([
       fetch('https://www.goldapi.io/api/XPT/EUR', { headers }),
@@ -1375,28 +1400,34 @@ async function fetchMetalPrices() {
     const newPrices = {
       platinum: pt.price ? Math.round(pt.price) : null,
       palladium: pd.price ? Math.round(pd.price) : null,
-      rhodium: null // goldapi free plan ne podržava XRH
+      rhodium: null
     };
 
-    if (_metalPrices.platinum !== null) {
-      _metalPrices.prev = {
-        platinum: _metalPrices.platinum,
-        palladium: _metalPrices.palladium,
-        rhodium: _metalPrices.rhodium
-      };
-    }
+    const prevPlatinum = row ? row.platinum : null;
+    const prevPalladium = row ? row.palladium : null;
+    const prevRhodium = row ? row.rhodium : null;
+
     _metalPrices.platinum = newPrices.platinum;
     _metalPrices.palladium = newPrices.palladium;
     _metalPrices.rhodium = newPrices.rhodium;
+    _metalPrices.prev = { platinum: prevPlatinum, palladium: prevPalladium, rhodium: prevRhodium };
     _metalPrices.updated = new Date().toISOString();
-    console.log('✅ Metal prices ažurirane:', newPrices);
+
+    // Sačuvaj u DB
+    await pool.query(`
+      INSERT INTO metal_prices_cache (id, platinum, palladium, rhodium, prev_platinum, prev_palladium, prev_rhodium, updated_at)
+      VALUES (1, $1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        platinum=$1, palladium=$2, rhodium=$3, prev_platinum=$4, prev_palladium=$5, prev_rhodium=$6, updated_at=NOW()
+    `, [newPrices.platinum, newPrices.palladium, newPrices.rhodium, prevPlatinum, prevPalladium, prevRhodium]);
+
+    console.log('✅ Metal prices ažurirane (API poziv):', newPrices);
   } catch(e) {
     console.error('Metal prices fetch error:', e.message);
   }
 }
 
 fetchMetalPrices();
-setInterval(fetchMetalPrices, 24 * 60 * 60 * 1000); // dnevno
 
 // GET /api/metal-prices
 app.get('/api/metal-prices', auth, (req, res) => {
