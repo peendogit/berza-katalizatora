@@ -635,6 +635,16 @@ async function renderMyListings() {
   el.innerHTML = await renderMetalWidget() + activeHtml + expiredHtml;
 }
 
+async function deleteListing(lid) {
+  if (!confirm('Obrisati ovaj oglas? Ova akcija je nepovratna.')) return;
+  try {
+    await api('DELETE', '/listings/'+lid);
+    invalidateListingsCache();
+    toast('🗑 Oglas obrisan', 'ok');
+    renderMyListings();
+  } catch(err) { toast('❌ ' + err.message, 'err'); }
+}
+
 async function reactivateListing(lid) {
   try {
     await api('PUT', '/listings/'+lid+'/status', { status: 'active' });
@@ -3067,6 +3077,7 @@ async function fetchMetalPrices() {
     _metalCacheTime = now;
     return data;
   } catch(e) {
+    console.error('Metal prices fetch error (frontend):', e.message);
     return { available: false };
   }
 }
