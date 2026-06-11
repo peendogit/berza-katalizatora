@@ -1267,29 +1267,35 @@ app.get('/api/admin/listings/:id/ponude', auth, adminOnly, async (req, res) => {
 });
 
 // GET /api/metal-prices
-app.get('/api/metal-prices', auth, (req, res) => {
-  if (!_metalPrices.updated) {
-    return res.json({ available: false });
+app.get('/api/metal-prices', auth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM metal_prices_cache WHERE id = 1');
+    const row = result.rows[0];
+    if (!row || !row.updated_at) {
+      return res.json({ available: false });
+    }
+    function trend(curr, prev) {
+      if (prev === null || curr === null) return 'flat';
+      const diff = ((curr - prev) / prev) * 100;
+      if (diff > 1) return 'up';
+      if (diff < -1) return 'down';
+      return 'flat';
+    }
+    res.json({
+      available: true,
+      platinum: row.platinum,
+      palladium: row.palladium,
+      rhodium: row.rhodium,
+      trends: {
+        platinum: trend(row.platinum, row.prev_platinum),
+        palladium: trend(row.palladium, row.prev_palladium),
+        rhodium: trend(row.rhodium, row.prev_rhodium)
+      },
+      updated: row.updated_at
+    });
+  } catch(e) {
+    res.json({ available: false });
   }
-  function trend(curr, prev) {
-    if (prev === null || curr === null) return 'flat';
-    const diff = ((curr - prev) / prev) * 100;
-    if (diff > 1) return 'up';
-    if (diff < -1) return 'down';
-    return 'flat';
-  }
-  res.json({
-    available: true,
-    platinum: _metalPrices.platinum,
-    palladium: _metalPrices.palladium,
-    rhodium: _metalPrices.rhodium,
-    trends: {
-      platinum: trend(_metalPrices.platinum, _metalPrices.prev.platinum),
-      palladium: trend(_metalPrices.palladium, _metalPrices.prev.palladium),
-      rhodium: trend(_metalPrices.rhodium, _metalPrices.prev.rhodium)
-    },
-    updated: _metalPrices.updated
-  });
 });
 
 // ─── DB migration ────────────────────────────────────────
