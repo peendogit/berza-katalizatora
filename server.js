@@ -1346,6 +1346,84 @@ app.put('/api/chat/:listing_id/read', auth, async (req, res) => {
   } catch(err) { res.status(500).json({ error: 'Greška' }); }
 });
 
+// ─── Cijene plemenitih metala (cache, dnevno) ────────────
+let _metalPrices = {
+  platinum: null, palladium: null, rhodium: null,
+  prev: { platinum: null, palladium: null, rhodium: null },
+  updated: null
+};
+
+async function fetchMetalPrices() {
+  if (!process.env.GOLDAPI_KEY) {
+    console.log('ℹ️  GOLDAPI_KEY nije podešen — metal prices isključeni');
+    return;
+  }
+  try {
+    const headers = { 'x-access-token': process.env.GOLDAPI_KEY };
+    const [ptRes, pdRes] = await Promise.all([
+      fetch('https://www.goldapi.io/api/XPT/EUR', { headers }),
+      fetch('https://www.goldapi.io/api/XPD/EUR', { headers })
+    ]);
+    const pt = await ptRes.json();
+    const pd = await pdRes.json();
+
+    if (pt.error || pd.error) {
+      console.error('Metal prices API error:', pt.error || pd.error);
+      return;
+    }
+
+    const newPrices = {
+      platinum: pt.price ? Math.round(pt.price) : null,
+      palladium: pd.price ? Math.round(pd.price) : null,
+      rhodium: null // goldapi free plan ne podržava XRH
+    };
+
+    if (_metalPrices.platinum !== null) {
+      _metalPrices.prev = {
+        platinum: _metalPrices.platinum,
+        palladium: _metalPrices.palladium,
+        rhodium: _metalPrices.rhodium
+      };
+    }
+    _metalPrices.platinum = newPrices.platinum;
+    _metalPrices.palladium = newPrices.palladium;
+    _metalPrices.rhodium = newPrices.rhodium;
+    _metalPrices.updated = new Date().toISOString();
+    console.log('✅ Metal prices ažurirane:', newPrices);
+  } catch(e) {
+    console.error('Metal prices fetch error:', e.message);
+  }
+}
+
+fetchMetalPrices();
+setInterval(fetchMetalPrices, 24 * 60 * 60 * 1000); // dnevno
+
+// GET /api/metal-prices
+app.get('/api/metal-prices', auth, (req, res) => {
+  if (!_metalPrices.updated) {
+    return res.json({ available: false });
+  }
+  function trend(curr, prev) {
+    if (prev === null || curr === null) return 'flat';
+    const diff = ((curr - prev) / prev) * 100;
+    if (diff > 1) return 'up';
+    if (diff < -1) return 'down';
+    return 'flat';
+  }
+  res.json({
+    available: true,
+    platinum: _metalPrices.platinum,
+    palladium: _metalPrices.palladium,
+    rhodium: _metalPrices.rhodium,
+    trends: {
+      platinum: trend(_metalPrices.platinum, _metalPrices.prev.platinum),
+      palladium: trend(_metalPrices.palladium, _metalPrices.prev.palladium),
+      rhodium: trend(_metalPrices.rhodium, _metalPrices.prev.rhodium)
+    },
+    updated: _metalPrices.updated
+  });
+});
+
 // ─── Cron: automatsko istjecanje ponuda ──────────────────
 async function expireOldPonude() {
   try {
