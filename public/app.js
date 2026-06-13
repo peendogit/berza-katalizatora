@@ -226,6 +226,7 @@ async function doRegister() {
   const addr  = document.getElementById('reg-addr').value.trim();
   const tel   = document.getElementById('reg-tel').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const country = (document.getElementById('reg-country')?.value || 'ba').toUpperCase();
   const pass  = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
   if (!document.getElementById('reg-terms')?.checked) {
@@ -240,7 +241,7 @@ async function doRegister() {
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity });
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity, country });
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
       const existing = document.getElementById('ov-pending');
