@@ -322,10 +322,17 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 // GET /api/listings  (buyers i admin vide sve aktivne; seller vidi svoje)
 app.get('/api/listings', auth, async (req, res) => {
   try {
+    // Za buyera, country čitamo iz baze (stari JWT tokeni nemaju country claim)
+    let userCountry = req.user.country;
+    if (req.user.role === 'buyer' && !userCountry) {
+      const cu = await pool.query('SELECT country FROM users WHERE id = $1', [req.user.id]);
+      userCountry = (cu.rows[0] && cu.rows[0].country) || 'BA';
+    }
+
     // Cache key po roli i kontekstu
     const cacheKey = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
                    : req.user.role === 'admin'  ? 'listings_admin'
-                   : `listings_buyer_${req.user.country||'BA'}`;
+                   : `listings_buyer_${userCountry||'BA'}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
@@ -388,7 +395,7 @@ app.get('/api/listings', auth, async (req, res) => {
                  l.images, l.status, l.country, l.created_at, l.listing_type, l.lot_items,
                  u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
-      params = [req.user.country || 'BA'];
+      params = [userCountry || 'BA'];
     }
 
     const result = await pool.query(query, params);
@@ -1464,16 +1471,26 @@ async function fetchRhodiumPrice() {
     const res = await fetch('https://www.kitco.com/price/precious-metals', {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
     });
+    if (!res.ok) {
+      console.error('Rhodium scrape: HTTP', res.status);
+      return null;
+    }
     const html = await res.text();
     // Traži rodijum cijenu u USD - format se mijenja, probamo nekoliko pattern-a
     let match = html.match(/Rhodium[\s\S]{0,500}?(\d{1,2}[,.]?\d{3}\.\d{2})/i);
     if (!match) {
-      // Alternativni pattern - data atribut
       match = html.match(/rhodium["'\s:]+(\d{1,2}[,.]?\d{3}(?:\.\d+)?)/i);
     }
-    if (!match) return null;
+    if (!match) {
+      console.error('Rhodium scrape: pattern not found, html length =', html.length);
+      return null;
+    }
     const usdPrice = parseFloat(match[1].replace(',', ''));
-    if (!usdPrice || usdPrice < 100 || usdPrice > 50000) return null; // sanity check
+    if (!usdPrice || usdPrice < 100 || usdPrice > 50000) {
+      console.error('Rhodium scrape: sanity check failed, value =', usdPrice);
+      return null;
+    }
+    console.log('✅ Rhodium scraped:', usdPrice, 'USD');
     return usdPrice;
   } catch(e) {
     console.error('Rhodium scrape error:', e.message);
