@@ -592,6 +592,14 @@ app.put('/api/listings/:id/status', auth, async (req, res) => {
       ? 'UPDATE listings SET status = $1, created_at = NOW() WHERE id = $2'
       : 'UPDATE listings SET status = $1 WHERE id = $2';
     await pool.query(updateQuery, [status, req.params.id]);
+
+    // Pri reaktivaciji obriši stare expired/rejected ponude — oglas kreće od nule
+    if (status === 'active') {
+      await pool.query(
+        `DELETE FROM ponude WHERE listing_id = $1 AND status IN ('expired', 'rejected')`,
+        [req.params.id]
+      );
+    }
     Object.keys(_serverCache).filter(k => k.startsWith('listings_')).forEach(k => invalidateCache(k));
     res.json({ ok: true });
   } catch (err) {
