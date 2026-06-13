@@ -502,10 +502,13 @@ async function submitListing() {
   const btn = document.getElementById('btn-submit-oglas');
   if (!isLot) {
     const marka = document.getElementById('f-marka').value.trim();
+    const broj = document.getElementById('f-broj').value.trim();
     if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+    if (!broj) { toast('Unesite OEM broj katalizatora', 'err'); return; }
   } else {
     const items = getLotItems();
     if (!items.length) { toast('Dodajte barem jedan katalizator u lot', 'err'); return; }
+    if (items.some(i => !i.broj)) { toast('Svaki katalizator u lotu mora imati OEM broj', 'err'); return; }
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
   const _reEnableBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; } };
@@ -606,7 +609,7 @@ async function renderMyListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '♻️';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
     const soldDate = l.sold_at ? fmtDate(new Date(l.sold_at).getTime()) : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
@@ -641,7 +644,7 @@ async function renderMyListings() {
       ${expired.map(l => {
         const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
         const thumbSrc = imgs[0] || null;
-        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '🔧';
+        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '♻️';
         return `<div class="s-oglas-card" style="opacity:.65">
           <div class="s-oglas-body">
             <div class="s-oglas-thumb">${thumb}</div>
@@ -721,7 +724,7 @@ function buildPonudeList(l) {
     const col = avCol(String(p.buyerId));
     const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected', isExp = p.status==='expired';
     const verB = p.premium ? '<span class="badge b-ok" style="font-size:10px">⭐ Premium</span>' : '';
-    const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">🥇 Najbolja</span>':'';
+    const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">⬆️ Najveća</span>':'';
     const acts = !isAcc&&!isDec&&!isExp ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
     const telB = isAcc ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">📞 ${buyerTel||'—'}</div>` : '';
     const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${escapeHtml(p.msg)}"</div>` : '';
@@ -834,7 +837,7 @@ async function renderZavrseni() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '♻️';
     const isPoslato = poslatoSet.has(l.id);
     const isOpen = !isPoslato; // poslato su zatvorene, ostale otvorene
 
@@ -980,7 +983,7 @@ async function renderBuyerListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'🪙'}</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'♻️'}</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
@@ -1163,7 +1166,7 @@ async function renderBuyerZavrseni() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallB = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '♻️';
     const isPoslato = l.status === 'sent';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
@@ -1222,7 +1225,7 @@ function renderMyPonude() {
     const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
     const thumb = thumbSrc
       ? `<img src="${thumbSrc}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0" onclick="${gallJS}">`
-      : `<span style="font-size:20px">🔧</span>`;
+      : `<span style="font-size:20px">♻️</span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
       ${thumb}
       <div style="flex:1;min-width:0">
@@ -1578,7 +1581,7 @@ function openProfil() {
       </div>
       <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
         Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
-        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='EUR' ? '15 EUR' : '50 KM'}</b>
+        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='EUR' ? '60 EUR/god (5 EUR/mj)' : '120 KM/god (10 KM/mj)'}</b>
       </div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
         <b style="color:var(--text)">Načini uplate:</b><br>
@@ -1821,9 +1824,9 @@ function openPremiumInfo() {
   const m = document.getElementById('prem-price-month');
   const y = document.getElementById('prem-price-year');
   if (m) m.innerHTML = rs
-    ? '15 <small style="font-size:16px;font-weight:400;color:var(--muted)">EUR / mjesec</small>'
-    : '29 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / mjesec</small>';
-  if (y) y.textContent = rs ? 'ili 150 EUR godišnje (uštedi 30 EUR)' : 'ili 290 KM godišnje (uštedi 58 KM)';
+    ? '60 <small style="font-size:16px;font-weight:400;color:var(--muted)">EUR / godišnje</small>'
+    : '120 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / godišnje</small>';
+  if (y) y.textContent = rs ? '(5 EUR / mjesec)' : '(10 KM / mjesec)';
   document.getElementById('ov-premium').classList.add('on');
 }
 
@@ -2247,7 +2250,7 @@ async function renderAdminOglasi() {
     const stStyle = l.status==='sent' ? 'background:rgba(41,128,185,.15);color:#5dade2;border:1px solid rgba(41,128,185,.3)' : '';
     return `<div class="admin-oglas-card" id="ac-l-${l.id}">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer" onclick="admToggleOglas(${l.id})">
-        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'🪙')}</div>
+        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'♻️')}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
             ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}
