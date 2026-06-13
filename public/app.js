@@ -340,7 +340,9 @@ async function tryAutoLogin() {
   const token = localStorage.getItem('token');
   if (!token) return;
   try {
-    const user = await api('GET', '/auth/me');
+    const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) { localStorage.removeItem('token'); return; }
+    const user = await res.json();
     loginUser(user);
   } catch {
     localStorage.removeItem('token');
