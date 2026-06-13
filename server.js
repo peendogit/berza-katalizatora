@@ -177,8 +177,8 @@ function invalidateCache(key) { delete _serverCache[key]; }
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password, name, fullname, role, city, addr, tel, country, entity } = req.body;
-    if (!email || !password || !name || !role) {
-      return res.status(400).json({ error: 'Popunite sva obavezna polja' });
+    if (!email || !password || !name || !role || !addr || !addr.trim()) {
+      return res.status(400).json({ error: 'Popunite sva obavezna polja (uključujući adresu)' });
     }
     if (!['seller', 'buyer'].includes(role)) {
       return res.status(400).json({ error: 'Nevažeća uloga' });
@@ -578,7 +578,10 @@ app.delete('/api/listings/:id', auth, async (req, res) => {
 // PUT /api/listings/:id/status  (seller označava kao završeno/poslato)
 app.put('/api/listings/:id/status', auth, async (req, res) => {
   try {
-    const { status } = req.body; // 'finished' | 'sent'
+    const { status } = req.body; // 'finished' | 'sent' | 'active'
+    if (!['finished', 'sent', 'active'].includes(status)) {
+      return res.status(400).json({ error: 'Nevažeći status' });
+    }
     const listing = await pool.query('SELECT * FROM listings WHERE id = $1', [req.params.id]);
     if (!listing.rows[0]) return res.status(404).json({ error: 'Ne postoji' });
     if (listing.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
@@ -1054,6 +1057,53 @@ app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
       pending_users: parseInt(pending.rows[0].count)
     });
   } catch (err) {
+    res.status(500).json({ error: 'Greška' });
+  }
+});
+
+// GET /api/admin/top-users — najbolji prodavači i otkupljivači
+app.get('/api/admin/top-users', auth, adminOnly, async (req, res) => {
+  try {
+    const [topSellers, topBuyers] = await Promise.all([
+      // Prodavači: broj oglasa, broj prodaja (finished/sent), ukupna vrijednost prodaja, prosječna ocjena
+      pool.query(`
+        SELECT u.id, u.name, u.city,
+          COUNT(DISTINCT l.id) AS total_listings,
+          COUNT(DISTINCT CASE WHEN l.status IN ('finished','sent') THEN l.id END) AS sales,
+          COALESCE(SUM(CASE WHEN l.status IN ('finished','sent') THEN p.cijena END), 0) AS revenue,
+          ROUND(AVG(r.stars)::numeric, 1) AS avg_rating,
+          COUNT(DISTINCT r.id) AS rating_count
+        FROM users u
+        LEFT JOIN listings l ON l.user_id = u.id
+        LEFT JOIN ponude p ON p.listing_id = l.id AND p.status = 'accepted'
+        LEFT JOIN ratings r ON r.to_user_id = u.id
+        WHERE u.role = 'seller'
+        GROUP BY u.id, u.name, u.city
+        HAVING COUNT(DISTINCT l.id) > 0
+        ORDER BY sales DESC, revenue DESC
+        LIMIT 10
+      `),
+      // Otkupljivači: broj ponuda, prihvaćene ponude, ukupna vrijednost otkupa, prosječna ocjena
+      pool.query(`
+        SELECT u.id, u.name, u.city,
+          COUNT(DISTINCT p.id) AS total_ponude,
+          COUNT(DISTINCT CASE WHEN p.status = 'accepted' THEN p.id END) AS accepted,
+          COALESCE(SUM(CASE WHEN p.status = 'accepted' THEN p.cijena END), 0) AS spent,
+          ROUND(AVG(r.stars)::numeric, 1) AS avg_rating,
+          COUNT(DISTINCT r.id) AS rating_count
+        FROM users u
+        LEFT JOIN ponude p ON p.buyer_id = u.id
+        LEFT JOIN ratings r ON r.to_user_id = u.id
+        WHERE u.role = 'buyer'
+        GROUP BY u.id, u.name, u.city
+        HAVING COUNT(DISTINCT p.id) > 0
+        ORDER BY accepted DESC, spent DESC
+        LIMIT 10
+      `)
+    ]);
+    res.json({ sellers: topSellers.rows, buyers: topBuyers.rows });
+  } catch (err) {
+    console.error('Top users error:', err.message);
     res.status(500).json({ error: 'Greška' });
   }
 });
