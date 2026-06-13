@@ -102,8 +102,8 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => String(u.id) === String(id));
-// Valuta po zemlji: BA = KM, RS = RSD
-const curr = c => (String(c||'').toUpperCase() === 'RS') ? 'RSD' : 'KM';
+// Valuta po zemlji: BA = KM, RS = EUR
+const curr = c => (String(c||'').toUpperCase() === 'RS') ? 'EUR' : 'KM';
 const lcurr = l => curr(l && l.country);
 const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: escapeHtml(l.owner_name)||'Nepoznat', city: escapeHtml(l.owner_city)||'—', tel: escapeHtml(l.owner_tel)||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1578,7 +1578,7 @@ function openProfil() {
       </div>
       <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
         Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
-        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='RSD' ? '3.000 RSD' : '50 KM'}</b>
+        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='EUR' ? '15 EUR' : '50 KM'}</b>
       </div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
         <b style="color:var(--text)">Načini uplate:</b><br>
@@ -1821,9 +1821,9 @@ function openPremiumInfo() {
   const m = document.getElementById('prem-price-month');
   const y = document.getElementById('prem-price-year');
   if (m) m.innerHTML = rs
-    ? '1.700 <small style="font-size:16px;font-weight:400;color:var(--muted)">RSD / mjesec</small>'
+    ? '15 <small style="font-size:16px;font-weight:400;color:var(--muted)">EUR / mjesec</small>'
     : '29 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / mjesec</small>';
-  if (y) y.textContent = rs ? 'ili 17.000 RSD godišnje (uštedi 3.400 RSD)' : 'ili 290 KM godišnje (uštedi 58 KM)';
+  if (y) y.textContent = rs ? 'ili 150 EUR godišnje (uštedi 30 EUR)' : 'ili 290 KM godišnje (uštedi 58 KM)';
   document.getElementById('ov-premium').classList.add('on');
 }
 
