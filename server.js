@@ -739,7 +739,7 @@ app.get('/api/ponude/my', auth, async (req, res) => {
 app.put('/api/ponude/:id/accept', auth, async (req, res) => {
   try {
     const ponuda = await pool.query(
-      `SELECT p.*, l.user_id as seller_id FROM ponude p
+      `SELECT p.*, l.user_id as seller_id, l.country FROM ponude p
        JOIN listings l ON l.id = p.listing_id
        WHERE p.id = $1`,
       [req.params.id]
@@ -770,7 +770,7 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
     // Email notifikacija kupcu
     notifyUser(ponuda.rows[0].buyer_id,
       '✅ Vaša ponuda je prihvaćena — Berza Katalizatora',
-      `<p>Dobra vijest! Vaša ponuda od <b>${ponuda.rows[0].cijena} KM</b> za oglas je prihvaćena.</p>
+      `<p>Dobra vijest! Vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'RSD':'KM'}</b> za oglas je prihvaćena.</p>
        <p>Prodavač će vas kontaktirati ili pogledajte detalje na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
     ).catch(()=>{});
 
@@ -784,7 +784,7 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
 app.put('/api/ponude/:id/reject', auth, async (req, res) => {
   try {
     const ponuda = await pool.query(
-      `SELECT p.*, l.user_id as seller_id FROM ponude p
+      `SELECT p.*, l.user_id as seller_id, l.country FROM ponude p
        JOIN listings l ON l.id = p.listing_id WHERE p.id = $1`,
       [req.params.id]
     );
@@ -797,7 +797,7 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
     // Email notifikacija kupcu
     notifyUser(ponuda.rows[0].buyer_id,
       'Vaša ponuda nije prihvaćena — Berza Katalizatora',
-      `<p>Žao nam je, vaša ponuda od <b>${ponuda.rows[0].cijena} KM</b> nije prihvaćena.</p>
+      `<p>Žao nam je, vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'RSD':'KM'}</b> nije prihvaćena.</p>
        <p>Možete pogledati nove oglase na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
     ).catch(()=>{});
 
@@ -1075,7 +1075,7 @@ app.get('/api/admin/top-users', auth, adminOnly, async (req, res) => {
     const [topSellers, topBuyers] = await Promise.all([
       // Prodavači: broj oglasa, broj prodaja (finished/sent), ukupna vrijednost prodaja, prosječna ocjena
       pool.query(`
-        SELECT u.id, u.name, u.city,
+        SELECT u.id, u.name, u.city, u.country,
           COUNT(DISTINCT l.id) AS total_listings,
           COUNT(DISTINCT CASE WHEN l.status IN ('finished','sent') THEN l.id END) AS sales,
           COALESCE(SUM(CASE WHEN l.status IN ('finished','sent') THEN p.cijena END), 0) AS revenue,
@@ -1086,14 +1086,14 @@ app.get('/api/admin/top-users', auth, adminOnly, async (req, res) => {
         LEFT JOIN ponude p ON p.listing_id = l.id AND p.status = 'accepted'
         LEFT JOIN ratings r ON r.to_user_id = u.id
         WHERE u.role = 'seller'
-        GROUP BY u.id, u.name, u.city
+        GROUP BY u.id, u.name, u.city, u.country
         HAVING COUNT(DISTINCT l.id) > 0
         ORDER BY sales DESC, revenue DESC
         LIMIT 10
       `),
       // Otkupljivači: broj ponuda, prihvaćene ponude, ukupna vrijednost otkupa, prosječna ocjena
       pool.query(`
-        SELECT u.id, u.name, u.city,
+        SELECT u.id, u.name, u.city, u.country,
           COUNT(DISTINCT p.id) AS total_ponude,
           COUNT(DISTINCT CASE WHEN p.status = 'accepted' THEN p.id END) AS accepted,
           COALESCE(SUM(CASE WHEN p.status = 'accepted' THEN p.cijena END), 0) AS spent,
@@ -1103,7 +1103,7 @@ app.get('/api/admin/top-users', auth, adminOnly, async (req, res) => {
         LEFT JOIN ponude p ON p.buyer_id = u.id
         LEFT JOIN ratings r ON r.to_user_id = u.id
         WHERE u.role = 'buyer'
-        GROUP BY u.id, u.name, u.city
+        GROUP BY u.id, u.name, u.city, u.country
         HAVING COUNT(DISTINCT p.id) > 0
         ORDER BY accepted DESC, spent DESC
         LIMIT 10
