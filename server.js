@@ -183,7 +183,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (!['seller', 'buyer'].includes(role)) {
       return res.status(400).json({ error: 'Nevažeća uloga' });
     }
-    const userCountry = ['BA','RS'].includes(country) ? country : 'BA';
+    const userCountry = ['BA','RS'].includes(String(country||'').toUpperCase()) ? String(country).toUpperCase() : 'BA';
 
     const exists = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
     if (exists.rows.length > 0) {
