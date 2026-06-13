@@ -527,6 +527,13 @@ app.post('/api/listings', auth, async (req, res) => {
       if (items.length > 50) return res.status(400).json({ error: 'Maksimalno 50 komada po lotu' });
     }
 
+    // Country iz baze (stari JWT tokeni nemaju country claim)
+    let sellerCountry = req.user.country;
+    if (!sellerCountry) {
+      const su = await pool.query('SELECT country FROM users WHERE id = $1', [req.user.id]);
+      sellerCountry = (su.rows[0] && su.rows[0].country) || 'BA';
+    }
+
     const result = await pool.query(
       `INSERT INTO listings (user_id, broj, marka, model, god, stanje, nap, images, status, country, listing_type, lot_items)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10, $11)
@@ -540,7 +547,7 @@ app.post('/api/listings', auth, async (req, res) => {
         isLot ? '' : (stanje||'Nepoznato'),
         nap||'',
         JSON.stringify(images||[]),
-        req.user.country || 'BA',
+        sellerCountry,
         isLot ? 'lot' : 'single',
         JSON.stringify(isLot ? (lot_items||[]) : [])
       ]
@@ -777,7 +784,7 @@ app.put('/api/ponude/:id/accept', auth, async (req, res) => {
     // Email notifikacija kupcu
     notifyUser(ponuda.rows[0].buyer_id,
       '✅ Vaša ponuda je prihvaćena — Berza Katalizatora',
-      `<p>Dobra vijest! Vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'RSD':'KM'}</b> za oglas je prihvaćena.</p>
+      `<p>Dobra vijest! Vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'EUR':'KM'}</b> za oglas je prihvaćena.</p>
        <p>Prodavač će vas kontaktirati ili pogledajte detalje na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
     ).catch(()=>{});
 
@@ -804,7 +811,7 @@ app.put('/api/ponude/:id/reject', auth, async (req, res) => {
     // Email notifikacija kupcu
     notifyUser(ponuda.rows[0].buyer_id,
       'Vaša ponuda nije prihvaćena — Berza Katalizatora',
-      `<p>Žao nam je, vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'RSD':'KM'}</b> nije prihvaćena.</p>
+      `<p>Žao nam je, vaša ponuda od <b>${ponuda.rows[0].cijena} ${(ponuda.rows[0].country||'BA')==='RS'?'EUR':'KM'}</b> nije prihvaćena.</p>
        <p>Možete pogledati nove oglase na <a href="https://berzakatalizatora.com">berzakatalizatora.com</a>.</p>`
     ).catch(()=>{});
 
