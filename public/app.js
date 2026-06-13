@@ -230,6 +230,7 @@ async function doRegister() {
     return;
   }
   if (!name) { toast('Unesite korisničko ime / naziv firme', 'err'); return; }
+  if (!addr) { toast('Unesite adresu', 'err'); return; }
   if (selEntity === 'fizicko' && !fullname) { toast('Unesite ime i prezime', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
   if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
@@ -2010,10 +2011,11 @@ async function renderAnalitika() {
   const el = document.getElementById('a-analitika');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const [users, listings, ponude] = await Promise.all([
+    const [users, listings, ponude, topUsers] = await Promise.all([
       api('GET', '/admin/users'),
       api('GET', '/listings'),
-      api('GET', '/admin/ponude').catch(() => [])
+      api('GET', '/admin/ponude').catch(() => []),
+      api('GET', '/admin/top-users').catch(() => ({ sellers: [], buyers: [] }))
     ]);
 
     const sellers   = users.filter(u => u.role === 'seller');
@@ -2140,7 +2142,29 @@ async function renderAnalitika() {
         ${premiumExpiringSoon.length ? row('Premium ističe za 30 dana', premiumExpiringSoon.length, 'var(--yellow)') : ''}
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
-      `)}</div>`;
+      `)}
+
+      ${topUsers.sellers && topUsers.sellers.length ? section('🏆 Top 10 prodavača', topUsers.sellers.map((u, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
+            <div style="font-size:11px;color:var(--muted)">${u.total_listings} oglasa · ${u.sales} prodaja${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);flex-shrink:0">${parseFloat(u.revenue).toLocaleString('de-DE')} KM</div>
+        </div>
+      `).join('')) : ''}
+
+      ${topUsers.buyers && topUsers.buyers.length ? section('🏆 Top 10 otkupljivača', topUsers.buyers.map((u, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
+            <div style="font-size:11px;color:var(--muted)">${u.total_ponude} ponuda · ${u.accepted} otkupa${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);flex-shrink:0">${parseFloat(u.spent).toLocaleString('de-DE')} KM</div>
+        </div>
+      `).join('')) : ''}</div>`;
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
