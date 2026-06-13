@@ -102,6 +102,9 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => String(u.id) === String(id));
+// Valuta po zemlji: BA = KM, RS = RSD
+const curr = c => (String(c||'').toUpperCase() === 'RS') ? 'RSD' : 'KM';
+const lcurr = l => curr(l && l.country);
 const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: escapeHtml(l.owner_name)||'Nepoznat', city: escapeHtml(l.owner_city)||'—', tel: escapeHtml(l.owner_tel)||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
@@ -729,7 +732,7 @@ function buildPonudeList(l) {
             <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>${p.buyerTx > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${p.buyerTx})</span>` : ''}
             ${verB} ${stB}
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} ${lcurr(l)}</div>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">ističe ${(() => { const rem = Math.ceil((p.expiresAt - Date.now()) / 86400000); return rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'; })()}</span>` : ''}</div>
         ${telB}${msgB}
@@ -839,7 +842,7 @@ async function renderZavrseni() {
         <div class="s-oglas-thumb" style="width:52px;height:52px;font-size:20px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' KM':''}</div>
+          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' '+lcurr(l):''}</div>
         </div>
         ${isPoslato ? '<span class="badge b-ok" style="flex-shrink:0">✅ Poslato</span>' : '<span class="badge b-wait" style="flex-shrink:0">📦 Za slanje</span>'}
         <span class="zav-chevron">▼</span>
@@ -1036,11 +1039,11 @@ function openPonudaOvMin(lid, naziv, minCijena) {
   const inp = document.getElementById('pon-iznos');
   if (inp) {
     inp.min = minCijena + 1;
-    inp.placeholder = 'Min. ' + (minCijena + 1) + ' KM';
+    inp.placeholder = 'Min. ' + (minCijena + 1) + ' ' + curr(CU && CU.country);
   }
   // Dodaj info o minimumu
   const sub = document.getElementById('pon-sub');
-  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' KM';
+  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' ' + curr(CU && CU.country);
 }
 
 function openPonudaOv(lid, naziv) {
@@ -1050,6 +1053,8 @@ function openPonudaOv(lid, naziv) {
   document.getElementById('pon-iznos').value = '';
   document.getElementById('pon-iznos').min = '';
   document.getElementById('pon-iznos').placeholder = 'npr. 150';
+  const curEl = document.getElementById('pon-curr');
+  if (curEl) curEl.textContent = curr(CU && CU.country);
   const subEl = document.getElementById('pon-sub');
   if (subEl) subEl.textContent = 'Unesite iznos vaše ponude';
   // Postavi default dana iz profila
@@ -1063,17 +1068,17 @@ function openPonudaOv(lid, naziv) {
 }
 function ponudaPreview() {
   const v=document.getElementById('pon-iznos').value;
-  document.getElementById('pon-prev-iznos').textContent=v?v+' KM':'—';
+  document.getElementById('pon-prev-iznos').textContent=v?v+' '+curr(CU && CU.country):'—';
 }
 function ponudaNext() {
   const c=parseFloat(document.getElementById('pon-iznos').value);
   if (!c||c<1) { toast('Unesite iznos ponude','err'); return; }
   const inp = document.getElementById('pon-iznos');
   const minVal = parseFloat(inp.min||0);
-  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' KM', 'err'); return; }
+  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' ' + curr(CU && CU.country), 'err'); return; }
   const l=LISTINGS.find(x=>x.id===_ponudaLid);
   const dani = parseInt(document.getElementById('pon-dani').value)||3;
-  document.getElementById('pon-prev-iznos').textContent=c+' KM';
+  document.getElementById('pon-prev-iznos').textContent=c+' '+curr(CU && CU.country);
   document.getElementById('pon-prev-naziv').textContent=(l?l.marka+' '+l.model:'')+(l?' · '+getOwner(l).name:'');
   const daniTxt = dani===1?'1 dan':dani+' dana';
   document.getElementById('pon-prev-dani').textContent='⏱ Vrijedi '+daniTxt+' od slanja';
@@ -1102,7 +1107,7 @@ async function ponudaConfirm() {
     invalidateListingsCache();
     await renderBuyerListings();
     bTab('moje');
-    toast('✅ Ponuda '+c+' KM poslana!','ok');
+    toast('✅ Ponuda '+c+' '+curr(CU && CU.country)+' poslana!','ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   }
@@ -1164,7 +1169,7 @@ async function renderBuyerZavrseni() {
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
           <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}📍 ${seller.city}</div>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' KM':''}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' '+lcurr(l):''}</div>
       </div>
       ${isPoslato
         ? `<span class="badge b-blue" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">📬 Katalizator je poslat!</span>
@@ -1219,7 +1224,7 @@ function renderMyPonude() {
       ${thumb}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} ${lcurr(l)} · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
     </div>`;
@@ -1570,7 +1575,7 @@ function openProfil() {
       </div>
       <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
         Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
-        Godišnja pretplata: <b style="color:var(--text)">50 KM</b>
+        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='RSD' ? '3.000 RSD' : '50 KM'}</b>
       </div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
         <b style="color:var(--text)">Načini uplate:</b><br>
@@ -1807,7 +1812,17 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.admin-dd')) closeAdminDD();
 });
 
-function openPremiumInfo() { document.getElementById('ov-premium').classList.add('on'); }
+function openPremiumInfo() {
+  // Cijene po zemlji korisnika
+  const rs = CU && String(CU.country).toUpperCase() === 'RS';
+  const m = document.getElementById('prem-price-month');
+  const y = document.getElementById('prem-price-year');
+  if (m) m.innerHTML = rs
+    ? '1.700 <small style="font-size:16px;font-weight:400;color:var(--muted)">RSD / mjesec</small>'
+    : '29 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / mjesec</small>';
+  if (y) y.textContent = rs ? 'ili 17.000 RSD godišnje (uštedi 3.400 RSD)' : 'ili 290 KM godišnje (uštedi 58 KM)';
+  document.getElementById('ov-premium').classList.add('on');
+}
 
 async function admSetPremium(uid, val) {
   try {
@@ -1917,7 +1932,7 @@ async function toggleUserDetail(uid) {
           <div style="font-size:11px;color:var(--muted)">Poslano: ${fmtDate(new Date(p.created_at).getTime())}${respondDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} KM</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} ${curr(p.country||l.country)}</div>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
@@ -2151,7 +2166,7 @@ async function renderAnalitika() {
             <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
             <div style="font-size:11px;color:var(--muted)">${u.total_listings} oglasa · ${u.sales} prodaja${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);flex-shrink:0">${parseFloat(u.revenue).toLocaleString('de-DE')} KM</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);flex-shrink:0">${parseFloat(u.revenue).toLocaleString('de-DE')} ${curr(u.country)}</div>
         </div>
       `).join('')) : ''}
 
@@ -2162,7 +2177,7 @@ async function renderAnalitika() {
             <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
             <div style="font-size:11px;color:var(--muted)">${u.total_ponude} ponuda · ${u.accepted} otkupa${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);flex-shrink:0">${parseFloat(u.spent).toLocaleString('de-DE')} KM</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);flex-shrink:0">${parseFloat(u.spent).toLocaleString('de-DE')} ${curr(u.country)}</div>
         </div>
       `).join('')) : ''}</div>`;
   } catch(e) {
@@ -2197,7 +2212,7 @@ async function admToggleOglas(id) {
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
               <span style="font-size:12px">${badge}</span>
               <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} ${lcurr(l)}</span>
               <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
             </div>`;
           }).join('');

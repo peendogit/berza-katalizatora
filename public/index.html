@@ -381,8 +381,8 @@
         <div>✅ Pristup novim oglasima odmah</div>
       </div>
     </div>
-    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:36px;text-align:center;margin-bottom:4px">29 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / mjesec</small></div>
-    <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">ili 290 KM godišnje (uštedi 58 KM)</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:36px;text-align:center;margin-bottom:4px" id="prem-price-month">29 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / mjesec</small></div>
+    <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px" id="prem-price-year">ili 290 KM godišnje (uštedi 58 KM)</div>
     <div style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;padding:12px;font-size:12px;color:var(--muted2);line-height:1.9;margin-bottom:14px">
       Uplati na: <b style="color:var(--text)">Berza Katalizatora d.o.o.</b><br>
       IBAN: <b style="color:var(--text)">BA39 1234 5678 9012 3456</b><br>
@@ -434,7 +434,7 @@
     </div>
     <div id="pon-step1">
       <div class="ponuda-input-big">
-        <div class="ponuda-km">KM</div>
+        <div class="ponuda-km" id="pon-curr">KM</div>
         <input type="number" id="pon-iznos" placeholder="0" min="1" oninput="ponudaPreview()" onkeydown="if(event.key==='Enter')ponudaNext()">
       </div>
       <div class="fg"><label>Ponuda vrijedi</label>
