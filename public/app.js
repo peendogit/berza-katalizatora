@@ -2292,9 +2292,9 @@ async function renderAdminOglasi() {
           ${!isLot?`<b>Stanje:</b> ${l.stanje||'—'}<br>`:''}
           <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
           ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${escapeHtml(l.accepted_buyer_name)} (${escapeHtml(l.accepted_buyer_city)||"—"})<br>` : ''}
-          ${l.sold_at ? `<b>Prodano:</b> ${new Date(l.sold_at).toLocaleDateString('bs')}<br>` : ''}
+          ${l.sold_at ? `<b>Prodano:</b> ${fmtDate(new Date(l.sold_at).getTime())}<br>` : ''}
           ${l.nap?`<b>Napomena:</b> ${escapeHtml(l.nap)}<br>`:''}
-          <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}
+          <b>Objavljeno:</b> ${fmtDate(new Date(l.created_at||Date.now()).getTime())}
         </div>
         ${parseInt(l.ponuda_count) > 0 ? `
           <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
