@@ -307,7 +307,7 @@
 
     <!-- SINGLE polja -->
     <div id="form-single">
-      <div class="fg"><label>Broj katalizatora (OEM / serijski)</label><input id="f-broj" placeholder="npr. 8946202200, 5Z0131701..."></div>
+      <div class="fg"><label>Broj katalizatora (OEM / serijski) *</label><input id="f-broj" placeholder="npr. 8946202200, 5Z0131701..."></div>
       <div class="row2">
         <div class="fg"><label>Marka vozila *</label><input id="f-marka" placeholder="npr. Toyota"></div>
         <div class="fg"><label>Model</label><input id="f-model" placeholder="npr. Corolla 1.6"></div>
@@ -322,7 +322,7 @@
 
     <!-- LOT polja -->
     <div id="form-lot" style="display:none">
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:10px">Svaki red = jedan katalizator. OEM broj nije obavezan.</div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:10px">Svaki red = jedan katalizator. OEM broj je obavezan.</div>
       <div id="lot-rows"></div>
       <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:12px;border-style:dashed" onclick="addLotRow()">+ Dodaj katalizator</button>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px" id="lot-count-info"></div>

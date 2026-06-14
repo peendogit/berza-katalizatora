@@ -2317,7 +2317,7 @@ function addLotRow() {
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
   row.innerHTML = `
     <div style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${count+1}</div>
-    <input placeholder="OEM broj (opcija)" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
+    <input placeholder="OEM broj *" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
     <select style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 8px;font-family:Barlow,sans-serif;font-size:12px;flex-shrink:0" class="lot-stanje">
       <option value="Originalni — neoštećen" selected>Originalni</option>
       <option value="Malo oštećen">Malo oštećen</option>
