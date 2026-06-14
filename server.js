@@ -328,6 +328,7 @@ app.get('/api/listings', auth, async (req, res) => {
       const cu = await pool.query('SELECT country FROM users WHERE id = $1', [req.user.id]);
       userCountry = (cu.rows[0] && cu.rows[0].country) || 'BA';
     }
+    console.log(`📍 Listings za buyer ${req.user.id}, country=${userCountry} (JWT=${req.user.country||'none'})`);
 
     // Cache key po roli i kontekstu
     const cacheKey = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
