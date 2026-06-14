@@ -1039,7 +1039,7 @@ app.delete('/api/admin/users/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/admin/ponude', auth, adminOnly, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, l.marka, l.model, l.god, u.name as buyer_name
+      `SELECT p.*, l.marka, l.model, l.god, l.country, u.name as buyer_name
        FROM ponude p 
        JOIN listings l ON l.id = p.listing_id
        JOIN users u ON u.id = p.buyer_id
@@ -1319,9 +1319,11 @@ app.put('/api/auth/email-notify', auth, async (req, res) => {
 app.get('/api/admin/listings/:id/ponude', auth, adminOnly, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT p.*, u.name as buyer_name, u.city as buyer_city, u.tel as buyer_tel
+      SELECT p.*, u.name as buyer_name, u.city as buyer_city, u.tel as buyer_tel,
+             l.country as listing_country
       FROM ponude p
       JOIN users u ON u.id = p.buyer_id
+      JOIN listings l ON l.id = p.listing_id
       WHERE p.listing_id = $1
       ORDER BY p.cijena DESC
     `, [req.params.id]);
