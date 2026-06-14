@@ -724,7 +724,7 @@ function buildPonudeList(l) {
     const col = avCol(String(p.buyerId));
     const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected', isExp = p.status==='expired';
     const verB = p.premium ? '<span class="badge b-ok" style="font-size:10px">⭐ Premium</span>' : '';
-    const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">⬆️ Najveća</span>':'';
+    const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">🥇 Najbolja</span>':'';
     const acts = !isAcc&&!isDec&&!isExp ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
     const telB = isAcc ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">📞 ${buyerTel||'—'}</div>` : '';
     const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${escapeHtml(p.msg)}"</div>` : '';
