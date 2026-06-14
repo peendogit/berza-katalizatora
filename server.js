@@ -400,6 +400,7 @@ app.get('/api/listings', auth, async (req, res) => {
 
     // Ako je buyer — dodaj info o vlastitim ponudama + fetchaj završene oglase
     if (req.user.role === 'buyer') {
+      console.log(`📍 Buyer ${req.user.id} (country=${userCountry}): vraćeno ${result.rows.length} oglasa, countries: ${[...new Set(result.rows.map(r=>r.country))].join(',') || 'nijedan'}`);
       const myPonude = await pool.query(
         `SELECT * FROM ponude WHERE buyer_id = $1`, [req.user.id]
       );
