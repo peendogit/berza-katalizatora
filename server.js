@@ -328,7 +328,6 @@ app.get('/api/listings', auth, async (req, res) => {
       const cu = await pool.query('SELECT country FROM users WHERE id = $1', [req.user.id]);
       userCountry = (cu.rows[0] && cu.rows[0].country) || 'BA';
     }
-    console.log(`📍 Listings za buyer ${req.user.id}, country=${userCountry} (JWT=${req.user.country||'none'})`);
 
     // Cache key po roli i kontekstu
     const cacheKey = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
@@ -356,8 +355,6 @@ app.get('/api/listings', auth, async (req, res) => {
                  u.name, u.city, u.tel
         ORDER BY l.created_at DESC`;
       params = [parseInt(req.user.id)];
-      const debugResult = await pool.query(query, params);
-      return res.json(debugResult.rows.map(l => ({ ...l, images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })() })));
     } else if (req.user.role === 'admin') {
       // Admin vidi SVE oglase bez filtera
       query = `
@@ -458,7 +455,7 @@ app.get('/api/listings', auth, async (req, res) => {
     }));
     const cacheKey2 = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
                     : req.user.role === 'admin'  ? 'listings_admin'
-                    : `listings_buyer_${req.user.country||'BA'}`;
+                    : `listings_buyer_${userCountry||'BA'}`;
     setCache(cacheKey2, response);
     res.json(response);
   } catch (err) {
