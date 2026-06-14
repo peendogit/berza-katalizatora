@@ -1964,7 +1964,7 @@ async function toggleUserDetail(uid) {
           <div style="font-size:11px;color:var(--muted)">Poslano: ${fmtDate(new Date(p.created_at).getTime())}${respondDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} ${curr(p.country||l.country)}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} ${curr(p.country)}</div>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
@@ -2244,7 +2244,7 @@ async function admToggleOglas(id) {
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
               <span style="font-size:12px">${badge}</span>
               <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} ${curr(p.listing_country)}</span>
               <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
             </div>`;
           }).join('');
