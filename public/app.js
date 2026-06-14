@@ -1112,7 +1112,7 @@ async function ponudaConfirm() {
     closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
     invalidateListingsCache();
     await renderBuyerListings();
-    bTab('moje');
+    bTab('oglasi');
     toast('✅ Ponuda '+c+' '+curr(CU && CU.country)+' poslana!','ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
@@ -1279,6 +1279,7 @@ async function loadChatMsgs(lid) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
+      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     // Spremi buyer_id za seller odgovor (prva poruka koja nije od sellera)
@@ -1291,6 +1292,16 @@ async function loadChatMsgs(lid) {
   renderChatMsgs();
 }
 
+function chatDateLabel(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return 'Danas';
+  if (diffDays === 1) return 'Jučer';
+  if (diffDays < 7) return d.toLocaleDateString('bs', { weekday: 'long' });
+  return d.toLocaleDateString('bs', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function renderChatMsgs() {
   const msgs = chatHistory[chatLid] || [];
   const el = document.getElementById('chat-msgs');
@@ -1298,6 +1309,7 @@ function renderChatMsgs() {
     el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Pošaljite prvu poruku</div>';
     return;
   }
+  let lastDate = null;
   el.innerHTML = msgs.map((m, i) => {
     const isMe = m.senderId === CU.id;
     const prev = msgs[i-1];
@@ -1309,7 +1321,19 @@ function renderChatMsgs() {
     const content = m.imgUrl
       ? `<img class="bubble-img" src="${escapeHtml(m.imgUrl)}" onclick="openLightbox('${jsAttr(m.imgUrl)}')">`
       : escapeHtml(m.msg).split('\n').join('<br>');
-    return `<div class="bubble-wrap ${isMe?'me':''}">
+
+    // Date separator
+    const msgDate = m.ts ? new Date(m.ts).toDateString() : null;
+    let dateSep = '';
+    if (msgDate && msgDate !== lastDate) {
+      lastDate = msgDate;
+      dateSep = `<div style="text-align:center;margin:12px 0 8px;font-size:11px;color:var(--muted);position:relative">
+        <span style="background:var(--dark);padding:0 10px;position:relative;z-index:1">${chatDateLabel(m.ts)}</span>
+        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);z-index:0"></div>
+      </div>`;
+    }
+
+    return `${dateSep}<div class="bubble-wrap ${isMe?'me':''}">
       ${!isMe?`<div class="bubble-av" style="background:${avColor};${showAv?'':'opacity:0;pointer-events:none'}">${avText}</div>`:''}
       <div class="bubble ${isMe?'me':'them'}">${content}<span class="bubble-time">${m.time}</span></div>
     </div>`;
@@ -2519,6 +2543,7 @@ async function loadChatMsgsWithBuyer(lid, buyerId) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
+      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     chatHistory[lid]._buyerId = buyerId;
