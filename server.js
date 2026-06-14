@@ -330,12 +330,6 @@ app.get('/api/listings', auth, async (req, res) => {
     }
 
     // Cache key po roli i kontekstu
-    const cacheKey = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
-                   : req.user.role === 'admin'  ? 'listings_admin'
-                   : `listings_buyer_${userCountry||'BA'}`;
-    const cached = getCached(cacheKey);
-    if (cached) return res.json(cached);
-
     let query, params;
 
     if (req.user.role === 'seller') {
@@ -453,10 +447,6 @@ app.get('/api/listings', auth, async (req, res) => {
       ...l,
       images: (() => { try { return Array.isArray(l.images) ? l.images : JSON.parse(l.images||'[]'); } catch(e) { return []; } })()
     }));
-    const cacheKey2 = req.user.role === 'seller' ? `listings_seller_${req.user.id}`
-                    : req.user.role === 'admin'  ? 'listings_admin'
-                    : `listings_buyer_${userCountry||'BA'}`;
-    setCache(cacheKey2, response);
     res.json(response);
   } catch (err) {
     console.error(err);
