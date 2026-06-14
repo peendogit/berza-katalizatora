@@ -275,6 +275,8 @@ async function doRegister() {
 }
 
 function loginUser(u) {
+  // Brisi frontend cache pri svaku novom loginu
+  invalidateListingsCache();
   // Blokira pending korisnike
   if (u.status === 'pending') {
     localStorage.removeItem('token');
@@ -2242,7 +2244,7 @@ async function admToggleOglas(id) {
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
               <span style="font-size:12px">${badge}</span>
               <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} ${lcurr(l)}</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
               <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
             </div>`;
           }).join('');
