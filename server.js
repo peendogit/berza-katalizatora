@@ -288,7 +288,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, role, status, city, addr, tel, premium, premium_until, default_dana, country
+      `SELECT id, email, name, fullname, role, status, city, addr, tel, premium, premium_until, default_dana, country, entity, email_notify
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -306,7 +306,7 @@ app.put('/api/auth/profile', auth, async (req, res) => {
     const result = await pool.query(
       `UPDATE users SET name=$1, city=$2, addr=$3, tel=$4, default_dana=$5
        WHERE id=$6
-       RETURNING id, email, name, role, status, city, addr, tel, premium, default_dana`,
+       RETURNING id, email, name, fullname, role, status, city, addr, tel, premium, premium_until, default_dana, country, entity, email_notify`,
       [name, city, addr, tel, default_dana || 3, req.user.id]
     );
     res.json(result.rows[0]);
