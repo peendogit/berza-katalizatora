@@ -49,6 +49,7 @@ let chatHistory = {};
 let chatLid = null;
 let _confirmCb = null;
 let _ponudaLid = null;
+let adminFilter = 'all';
 const FREE_DAILY_LIMIT = 10; // max ponuda dnevno za free korisnike
 // dailyBids[userId] = {date:'2024-01-15', count:3}
 const dailyBids = {};
@@ -72,16 +73,6 @@ function incrementBidsToday(uid) {
   dailyBids[uid].count++;
 }
 
-// Sync daily bids count sa serverom
-async function syncBidsToday() {
-  if (!CU || CU.role !== 'buyer' || CU.premium) return;
-  try {
-    const data = await api('GET', '/ponude/count-today');
-    const today = getTodayStr();
-    dailyBids[CU.id] = { date: today, count: parseInt(data.count) || 0 };
-  } catch(e) {}
-}
-
 function canBid() {
   if (!CU || CU.role !== 'buyer') return false;
   if (CU.premium) return true; // premium — neograničeno
@@ -102,37 +93,12 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => String(u.id) === String(id));
-// Valuta po zemlji: BA = KM, RS = EUR
-const curr = c => (String(c||'').toUpperCase() === 'RS') ? 'EUR' : 'KM';
-const lcurr = l => curr(l && l.country);
-const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: escapeHtml(l.owner_name)||'Nepoznat', city: escapeHtml(l.owner_city)||'—', tel: escapeHtml(l.owner_tel)||'—' });
+const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: l.owner_name||'Nepoznat', city: l.owner_city||'—', tel: l.owner_tel||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
 const avCol    = id => { const s = String(id||'x'); return avColors[s.charCodeAt(s.length-1) % avColors.length]; };
 const now8     = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 const fmtDate  = ts => { if(!ts) return ''; const d=new Date(ts); return d.getDate().toString().padStart(2,'0')+'. '+(d.getMonth()+1).toString().padStart(2,'0')+'. '+d.getFullYear()+'.'; };
-function escapeHtml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-// Za ubacivanje teksta unutar JS string literala u onclick="..." atributima.
-// Escapuje i HTML i JS-specijalne znakove (', \, newline) da spriječi injection.
-function jsAttr(s) {
-  if (s === null || s === undefined) return '';
-  return String(s)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, ' ')
-    .replace(/\r/g, '');
-}
 
 // ═══════════════════════════════════════════════════════
 // PAGE NAVIGATION
@@ -188,15 +154,6 @@ async function api(method, path, body) {
     throw new Error('Server greška (' + res.status + ')');
   }
   const data = await res.json();
-  if (res.status === 401) {
-    // Sesija istekla ili novi login na drugom uređaju
-    const msg = data.error || 'Sesija istekla';
-    localStorage.removeItem('token');
-    CU = null;
-    showPage('page-hero');
-    toast('⚠️ ' + msg, 'err');
-    throw new Error(msg);
-  }
   if (!res.ok) throw new Error(data.error || 'Greška');
   return data;
 }
@@ -221,51 +178,20 @@ async function doLogin() {
 
 async function doRegister() {
   const name  = document.getElementById('reg-name').value.trim();
-  const fullname = selEntity === 'fizicko' ? (document.getElementById('reg-fullname')?.value.trim() || '') : '';
   const city  = document.getElementById('reg-city').value.trim();
   const addr  = document.getElementById('reg-addr').value.trim();
   const tel   = document.getElementById('reg-tel').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
-  const country = (document.getElementById('reg-country')?.value || 'ba').toUpperCase();
   const pass  = document.getElementById('reg-pass').value;
-  const pass2 = document.getElementById('reg-pass2').value;
-  if (!document.getElementById('reg-terms')?.checked) {
-    toast('Morate prihvatiti Uslove korišćenja', 'err');
-    return;
-  }
-  if (!name) { toast('Unesite korisničko ime / naziv firme', 'err'); return; }
-  if (!addr) { toast('Unesite adresu', 'err'); return; }
-  if (selEntity === 'fizicko' && !fullname) { toast('Unesite ime i prezime', 'err'); return; }
+  if (!name||!city||!tel||!email||!pass) { toast('Popunite sva obavezna polja', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
-  if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity, country });
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, city, addr, tel, role: selRole });
     localStorage.setItem('token', token);
-    if (user.status === 'pending') {
-      const existing = document.getElementById('ov-pending');
-      if (existing) existing.remove();
-      const ov = document.createElement('div');
-      ov.id = 'ov-pending';
-      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:20px';
-      ov.innerHTML = `
-        <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:32px 24px;max-width:360px;width:100%;text-align:center">
-          <div style="font-size:56px;margin-bottom:16px">⏳</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;margin-bottom:12px;color:#fff">Nalog je kreiran!</div>
-          <div style="font-size:14px;color:#aaa;line-height:1.7;margin-bottom:20px">
-            Vaš nalog čeka odobrenje administratora.<br>
-            Bićete obaviješteni emailom čim nalog postane aktivan.
-          </div>
-          <div style="font-size:12px;color:#666;margin-bottom:20px">
-            Pitanja? <a href="mailto:berzakatalizatora@gmail.com" style="color:#f4772e">berzakatalizatora@gmail.com</a>
-          </div>
-          <button onclick="document.getElementById('ov-pending').remove();showLoginPage()" style="background:#f4772e;border:none;color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;padding:12px 32px;border-radius:8px;cursor:pointer;width:100%">U redu</button>
-        </div>`;
-      document.body.appendChild(ov);
-      return;
-    }
     loginUser(user);
+    if (user.status === 'pending') toast('✅ Registracija uspješna! Čekate odobrenje admina.', 'ok');
   } catch (err) {
     toast('❌ ' + err.message, 'err');
   } finally {
@@ -275,31 +201,11 @@ async function doRegister() {
 }
 
 function loginUser(u) {
-  // Brisi frontend cache pri svaku novom loginu
-  invalidateListingsCache();
-  // Blokira pending korisnike
-  if (u.status === 'pending') {
-    localStorage.removeItem('token');
-    showPage('page-hero');
-    toast('⏳ Vaš nalog još čeka odobrenje administratora.', '');
-    return;
-  }
-  if (u.status === 'blocked' || u.status === 'rejected') {
-    localStorage.removeItem('token');
-    showPage('page-hero');
-    toast('❌ Vaš nalog je blokiran. Kontaktirajte berzakatalizatora@gmail.com', 'err');
-    return;
-  }
   // Normalizuj snake_case polja iz API-ja u camelCase
   if (u.premium_until && !u.premiumUntil) u.premiumUntil = new Date(u.premium_until).getTime();
   if (u.default_dana && !u.defaultDana) u.defaultDana = u.default_dana;
-  if (u.email_notify === undefined) u.emailNotify = true;
-  else u.emailNotify = u.email_notify !== false;
   CU = u;
   expireOld();
-  // Provjeri broadcast notifikacije
-  if (u.role !== 'admin') checkBroadcasts();
-  if (u.role === 'buyer') syncBidsToday();
   // Header
   document.getElementById('hdr-guest').style.display = 'none';
   const hu = document.getElementById('hdr-user');
@@ -343,9 +249,7 @@ async function tryAutoLogin() {
   const token = localStorage.getItem('token');
   if (!token) return;
   try {
-    const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } });
-    if (!res.ok) { localStorage.removeItem('token'); return; }
-    const user = await res.json();
+    const user = await api('GET', '/auth/me');
     loginUser(user);
   } catch {
     localStorage.removeItem('token');
@@ -361,8 +265,7 @@ function pickRole(r) {
   document.getElementById('role-seller').classList.toggle('sel', r==='seller');
   document.getElementById('role-buyer').classList.toggle('sel', r==='buyer');
   document.getElementById('reg-btn').textContent = 'Registruj se';
-  // Entity wrap uvijek vidljiv za oba tipa
-  document.getElementById('reg-entity-wrap').style.display = '';
+  document.getElementById('reg-entity-wrap').style.display = r==='buyer' ? '' : 'none';
   pickEntity(selEntity); // refresh label
 }
 function pickEntity(e) {
@@ -371,15 +274,12 @@ function pickEntity(e) {
   document.getElementById('ent-firma').classList.toggle('sel', e==='firma');
   const lbl = document.getElementById('reg-name-label');
   const inp = document.getElementById('reg-name');
-  const fullnameWrap = document.getElementById('reg-fullname-wrap');
   if (e === 'firma') {
-    if (lbl) lbl.textContent = 'Naziv firme *';
-    if (inp) inp.placeholder = '';
-    if (fullnameWrap) fullnameWrap.style.display = 'none';
+    lbl.textContent = 'Naziv firme *';
+    inp.placeholder = 'npr. AutoKat d.o.o.';
   } else {
-    if (lbl) lbl.textContent = 'Korisničko ime *';
-    if (inp) inp.placeholder = '';
-    if (fullnameWrap) fullnameWrap.style.display = '';
+    lbl.textContent = 'Ime i prezime *';
+    inp.placeholder = 'npr. Mirko Perić';
   }
 }
 function pickPM(m) {
@@ -467,25 +367,12 @@ async function resizeImage(file, maxPx=900, quality=0.72) {
 }
 
 async function handleFiles(files) {
-  const pg = document.getElementById('prev-grid');
-  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
-  if (!arr.length) return;
-  // Progress prikaz
-  const progId = 'upload-prog';
-  let progEl = document.getElementById(progId);
-  if (!progEl) {
-    progEl = document.createElement('div');
-    progEl.id = progId;
-    progEl.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 0;margin-bottom:4px';
-    pg.parentNode.insertBefore(progEl, pg);
-  }
-  for (let i = 0; i < arr.length; i++) {
-    progEl.textContent = `Obrađujem ${i+1}/${arr.length}...`;
-    const resized = await resizeImage(arr[i]);
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const resized = await resizeImage(f);
     uploads.push(resized);
   }
-  progEl.remove();
-  pg.innerHTML = uploads.map((f,i)=>
+  document.getElementById('prev-grid').innerHTML = uploads.map((f,i)=>
     `<div class="prev-item"><img src="${URL.createObjectURL(f)}" onclick="openLightbox(this.src)" style="cursor:zoom-in"><button class="prev-rm" onclick="event.stopPropagation();rmFile(${i})">✕</button></div>`
   ).join('');
 }
@@ -500,18 +387,9 @@ function rmFile(i) {
 // SUBMIT LISTING
 // ═══════════════════════════════════════════════════════
 async function submitListing() {
-  const isLot = _listingType === 'lot';
+  const marka = document.getElementById('f-marka').value.trim();
+  if (!marka) { toast('Unesite marku vozila', 'err'); return; }
   const btn = document.getElementById('btn-submit-oglas');
-  if (!isLot) {
-    const marka = document.getElementById('f-marka').value.trim();
-    const broj = document.getElementById('f-broj').value.trim();
-    if (!marka) { toast('Unesite marku vozila', 'err'); return; }
-    if (!broj) { toast('Unesite OEM broj katalizatora', 'err'); return; }
-  } else {
-    const items = getLotItems();
-    if (!items.length) { toast('Dodajte barem jedan katalizator u lot', 'err'); return; }
-    if (items.some(i => !i.broj)) { toast('Svaki katalizator u lotu mora imati OEM broj', 'err'); return; }
-  }
   if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
   const _reEnableBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; } };
   try {
@@ -528,33 +406,27 @@ async function submitListing() {
       const upData = await upRes.json();
       if (upData.urls) imageUrls = upData.urls;
     }
-    const payload = isLot ? {
-      listing_type: 'lot',
-      lot_items: getLotItems(),
-      nap: document.getElementById('f-nap').value.trim(),
-      images: imageUrls
-    } : {
-      listing_type: 'single',
+    await api('POST', '/listings', {
       broj:   document.getElementById('f-broj').value.trim(),
-      marka:  document.getElementById('f-marka').value.trim(),
+      marka,
       model:  document.getElementById('f-model').value.trim(),
       god:    document.getElementById('f-god').value.trim(),
       stanje: document.getElementById('f-stanje').value,
       nap:    document.getElementById('f-nap').value.trim(),
       images: imageUrls
-    };
-    await api('POST', '/listings', payload);
+    });
     uploads = [];
     document.getElementById('prev-grid').innerHTML = '';
-    ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+    ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => document.getElementById(id).value='');
     _reEnableBtn();
     closeOv('ov-novi');
-    toast(isLot ? `✅ Lot objavljen!` : '✅ Oglas objavljen!', 'ok');
+    toast('✅ Oglas objavljen!', 'ok');
     invalidateListingsCache();
     sTab('oglasi');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
-    _reEnableBtn();
+  } finally {
+    const btn = document.getElementById('novi-submit-btn');
   }
 }
 
@@ -562,8 +434,10 @@ async function submitListing() {
 // EXPIRE
 // ═══════════════════════════════════════════════════════
 function expireOld() {
-  // Status 'expired' sad upravlja isključivo server (cron expireOldListings).
-  // Lokalna logika uklonjena da ne override-uje server status.
+  const WEEK = 7*86400000;
+  LISTINGS.forEach(l => {
+    if (l.status==='active' && !l.ponude.length && (Date.now()-l.createdAt) > WEEK) l.status='expired';
+  });
   // Provjeri istek verified
   USERS.forEach(u => {
     if (u.premium && u.premiumUntil && Date.now() > u.premiumUntil) {
@@ -586,24 +460,22 @@ async function renderMyListings() {
   try {
     const data = await cachedListings();
     LISTINGS = data.map(l => ({
-      ...parseListing(l),
-      _ponuda_count: parseInt(l.ponuda_count)||0,
-      _pending_count: parseInt(l.pending_count)||0
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(),
+      ponude: [],
+      _ponuda_count: parseInt(l.ponuda_count)||0
     }));
   } catch(e) { toast('Greška pri učitavanju oglasa', 'err'); }
-  expireOld();
-  const mine    = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
-  const expired = LISTINGS.filter(l => l.uid===CU.id && l.status==='expired');
+  const mine = LISTINGS.filter(l => l.uid===CU.id && l.status==='active');
   const el = document.getElementById('s-oglasi');
-
-  if (!mine.length && !expired.length) {
+  if (!mine.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
     return;
   }
-
-  const activeHtml = mine.length ? mine.map(l => {
+  el.innerHTML = mine.map(l => {
     const pend = l.ponude.filter(p => p.status==='pending').length;
-    const totalPonuda = pend || parseInt(l._pending_count||0);
+    // Koristiti ponuda_count iz API ako lokalne ponude nisu učitane
+    const totalPonuda = pend || parseInt(l.pending_count||l._ponuda_count||0);
     const hasPending = totalPonuda > 0;
     const badge = hasPending
       ? `<span class="badge b-ok" style="cursor:pointer" onclick="event.stopPropagation();togglePP(${l.id})">📨 ${totalPonuda} ${totalPonuda===1?'ponuda':'ponude'} ▾</span>`
@@ -611,84 +483,37 @@ async function renderMyListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '♻️';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
+    const addedDate = l.createdAt ? fmtDate(l.createdAt) : '';
     const soldDate = l.sold_at ? fmtDate(new Date(l.sold_at).getTime()) : '';
+    const expW = l.status==='active' && !l.ponude.length && rem<=3 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
       <div class="s-oglas-body">
         <div class="s-oglas-thumb">${thumb}</div>
         <div style="flex:1">
-          <div class="s-oglas-title">${
-            l.listing_type === 'lot'
-              ? `<span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:4px">LOT</span>📦 ${Array.isArray(l.lot_items)?l.lot_items.length:0} katalizatora`
-              : `${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}`
-          }</div>
+          <div class="s-oglas-title">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
           <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
           <div class="s-oglas-meta" style="color:var(--muted)">
             📅 ${fmtDate(l.createdAt)}
             ${soldDate ? ' &nbsp;·&nbsp; ✅ Prodano: '+soldDate : ''}
-            ${!soldDate ? ' &nbsp;·&nbsp; ' + (rem > 0
-              ? (rem <= 3
-                  ? '<span style="color:var(--yellow)">⚠️ Ističe za '+rem+' '+(rem===1?'dan':'dana')+'</span>'
-                  : 'Ističe za '+rem+' '+(rem===1?'dan':'dana'))
-              : '<span style="color:var(--red)">Istekao</span>') : ''}
+            ${!soldDate ? ' &nbsp;·&nbsp; ' + (l.ponude.length
+              ? '✅ Ima ponuda — oglas ne ističe'
+              : rem > 0
+                ? (rem <= 3
+                    ? '<span style="color:var(--yellow)">⚠️ Ističe za '+rem+' '+(rem===1?'dan':'dana')+'</span>'
+                    : 'Ističe za '+rem+' '+(rem===1?'dan':'dana'))
+                : '<span style="color:var(--red)">Istekao</span>') : ''}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${badge}</div>
         </div>
       </div>
       <div class="ponude-panel" id="pp-${l.id}"></div>
     </div>`;
-  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nemate aktivnih oglasa</h3><p>Dodajte prvi oglas.</p><button class="btn btn-primary" onclick="openNoviOglas()">+ Dodaj oglas</button></div>`;
-
-  const expiredHtml = expired.length ? `
-    <div style="margin-top:20px">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⏰ Istekli oglasi (${expired.length})</div>
-      ${expired.map(l => {
-        const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
-        const thumbSrc = imgs[0] || null;
-        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '♻️';
-        return `<div class="s-oglas-card" style="opacity:.65">
-          <div class="s-oglas-body">
-            <div class="s-oglas-thumb">${thumb}</div>
-            <div style="flex:1">
-              <div class="s-oglas-title" style="color:var(--muted)">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-              <div class="s-oglas-meta">${l.broj?'Nr. '+l.broj+' · ':''}${l.stanje}</div>
-              <div class="s-oglas-meta">📅 ${fmtDate(l.createdAt)} &nbsp;·&nbsp; <span style="color:var(--red)">Isteklo bez ponuda</span></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();reactivateListing(${l.id})">🔄 Reaktiviraj</button>
-                <button class="btn btn-or btn-xs" onclick="event.stopPropagation();deleteListing(${l.id})">🗑 Obriši</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>` : '';
-
-  el.innerHTML = await renderMetalWidget() + activeHtml + expiredHtml;
-}
-
-async function deleteListing(lid) {
-  if (!confirm('Obrisati ovaj oglas? Ova akcija je nepovratna.')) return;
-  try {
-    await api('DELETE', '/listings/'+lid);
-    invalidateListingsCache();
-    toast('🗑 Oglas obrisan', 'ok');
-    renderMyListings();
-  } catch(err) { toast('❌ ' + err.message, 'err'); }
-}
-
-async function reactivateListing(lid) {
-  try {
-    await api('PUT', '/listings/'+lid+'/status', { status: 'active' });
-    invalidateListingsCache();
-    toast('✅ Oglas reaktiviran — važi još 7 dana', 'ok');
-    renderMyListings();
-  } catch(err) { toast('❌ ' + err.message, 'err'); }
+  }).join('');
 }
 
 async function togglePP(lid) {
-  // Ne reaguj ako je profil modal otvoren
-  if (document.getElementById('ov-user-profile')) return;
   const panel = document.getElementById('pp-'+lid);
   if (!panel) return;
   if (panel.style.display==='block') { panel.style.display='none'; return; }
@@ -701,9 +526,7 @@ async function togglePP(lid) {
       id: p.id, buyerId: p.buyer_id, cijena: parseFloat(p.cijena),
       msg: '', time: new Date(p.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'}),
       status: p.status, dani: p.dani,
-      expiresAt: p.expires_at ? new Date(p.expires_at).getTime() : null,
-      buyerName: escapeHtml(p.buyer_name), buyerCity: escapeHtml(p.buyer_city), buyerTel: escapeHtml(p.buyer_tel), buyerAddr: escapeHtml(p.buyer_addr),
-      buyerTx: parseInt(p.buyer_transactions) || 0,
+      buyerName: p.buyer_name, buyerCity: p.buyer_city, buyerTel: p.buyer_tel, buyerAddr: p.buyer_addr,
       premium: false
     }));
     // Ažuriraj lokalni LISTINGS
@@ -720,29 +543,26 @@ function buildPonudeList(l) {
   const sorted = [...l.ponude].sort((a,b) => b.cijena-a.cijena);
   if (!sorted.length) return '<div style="font-size:13px;color:var(--muted);padding:8px">Nema ponuda</div>';
   return sorted.map((p,i) => {
-    const buyerName = p.buyerName || escapeHtml((getU(p.buyerId)||{name:'Otkupljivač'}).name);
-    const buyerCity = p.buyerCity || escapeHtml((getU(p.buyerId)||{city:'—'}).city);
-    const buyerTel  = p.buyerTel  || escapeHtml((getU(p.buyerId)||{tel:'—'}).tel);
+    const buyerName = p.buyerName || (getU(p.buyerId)||{name:'Otkupljivač'}).name;
+    const buyerCity = p.buyerCity || (getU(p.buyerId)||{city:'—'}).city;
+    const buyerTel  = p.buyerTel  || (getU(p.buyerId)||{tel:'—'}).tel;
     const col = avCol(String(p.buyerId));
-    const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected', isExp = p.status==='expired';
+    const isAcc = p.status==='accepted', isDec = p.status==='declined' || p.status==='rejected';
     const verB = p.premium ? '<span class="badge b-ok" style="font-size:10px">⭐ Premium</span>' : '';
     const stB  = isAcc?'<span class="badge b-ok" style="font-size:10px">✅ Prihvaćena</span>':isDec?'<span class="badge b-err" style="font-size:10px">❌ Odbijena</span>':i===0?'<span class="badge b-orange" style="font-size:10px">🥇 Najbolja</span>':'';
-    const acts = !isAcc&&!isDec&&!isExp ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
+    const acts = !isAcc&&!isDec ? `<button class="btn btn-og btn-xs" onclick="event.stopPropagation();acceptPonuda(${p.id},${l.id})">✅ Prihvati</button><button class="btn btn-or btn-xs" onclick="event.stopPropagation();declinePonuda(${p.id},${l.id})">❌ Odbij</button>` : '';
     const telB = isAcc ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px">📞 ${buyerTel||'—'}</div>` : '';
-    const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${escapeHtml(p.msg)}"</div>` : '';
+    const msgB = p.msg ? `<div style="font-size:12px;color:var(--muted2);font-style:italic;margin-top:4px;word-break:break-word;white-space:normal">"${p.msg}"</div>` : '';
     const bg   = isAcc?'var(--gL)':isDec?'rgba(0,0,0,.15)':'rgba(255,255,255,.03)';
     const bc   = isAcc?'rgba(29,185,84,.2)':isDec?'var(--border)':'var(--border2)';
-    return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${(isDec||isExp)?.5:1}">
-      <div class="ponuda-av" style="background:${col};cursor:pointer" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${initials(buyerName)}</div>
+    return `<div class="ponuda-row" style="background:${bg};border-color:${bc};opacity:${isDec?.5:1}">
+      <div class="ponuda-av" style="background:${col}">${initials(buyerName)}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>${p.buyerTx > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${p.buyerTx})</span>` : ''}
-            ${verB} ${stB}
-          </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} ${lcurr(l)}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${buyerName} ${verB} ${stB}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'}";flex-shrink:0>${p.cijena} KM</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">ističe ${(() => { const rem = Math.ceil((p.expiresAt - Date.now()) / 86400000); return rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'; })()}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}</div>
         ${telB}${msgB}
         ${acts ? `<div style="display:flex;gap:6px;margin-top:8px">${acts}</div>` : ''}
       </div>
@@ -790,7 +610,10 @@ async function renderZavrseni() {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await cachedListings();
-    LISTINGS = data.map(parseListing);
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(), ponude: []
+    }));
   } catch(e) { el.innerHTML = '<div class="empty"><p>Greška pri učitavanju.</p></div>'; return; }
   const mine = LISTINGS.filter(l => l.uid === CU.id && (l.status === 'finished' || l.status === 'sent' || l.status === 'sold'));
   if (!mine.length) {
@@ -805,21 +628,6 @@ async function renderZavrseni() {
   });
   // Sync poslatoSet iz API statusa (status='sent' == označeno kao poslato)
   merged.forEach(l => { if (l.status === 'sent') poslatoSet.add(l.id); });
-  // Fetchaj koje transakcije su već ocijenjene
-  let ratedSet = new Set();
-  let ratingMap = {};
-  try {
-    const ratingChecks = await Promise.all(
-      merged.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
-    );
-    merged.forEach((l, i) => {
-      if (ratingChecks[i].rated) {
-        ratedSet.add(l.id);
-        ratingMap[l.id] = ratingChecks[i].rating;
-      }
-    });
-  } catch(e) {}
-
   // Sortiraj: najnoviji na vrhu, poslato na dno
   const sorted = [...merged].sort((a, b) => {
     const aP = poslatoSet.has(a.id) ? 1 : 0;
@@ -834,23 +642,21 @@ async function renderZavrseni() {
   const hasMore = sorted.length > paginated.length;
   el.innerHTML = paginated.map(l => {
     const acc   = l.ponude.find(p => p.status === 'accepted');
-    const buyer = acc ? { name: escapeHtml(acc.buyer_name)||"Kupac", city: escapeHtml(acc.buyer_city)||"—", tel: escapeHtml(acc.buyer_tel)||"—" } : null;
+    const buyer = acc ? { name: acc.buyer_name||'Kupac', city: acc.buyer_city||'—', tel: acc.buyer_tel||'—' } : null;
     const addr  = acc ? getBuyerAddr(acc) : null;
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '♻️';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
     const isPoslato = poslatoSet.has(l.id);
-    const isOpen = !isPoslato; // poslato su zatvorene, ostale otvorene
-
-    const rateBtn = buyer && acc ? `<button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${ratedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${acc.buyer_id||acc.id},${l.id},'${jsAttr(l.marka+' '+l.model)}',this)">${ratedSet.has(l.id) ? '⭐ Ocijenjeno ' + (ratingMap[l.id] ? '★'.repeat(ratingMap[l.id].stars)+'☆'.repeat(5-ratingMap[l.id].stars) : '') : '⭐ Ocijeni kupca'}</button>` : '';
+    const isOpen = !isPoslato; // neposlato je defaultno otvoreno
 
     return `<div class="zav-card${isPoslato?' poslato':''}${isOpen?' open':''}" id="zav-${l.id}">
       <div class="zav-header" onclick="toggleZav(${l.id})">
         <div class="s-oglas-thumb" style="width:52px;height:52px;font-size:20px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' '+lcurr(l):''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' KM':''}</div>
         </div>
         ${isPoslato ? '<span class="badge b-ok" style="flex-shrink:0">✅ Poslato</span>' : '<span class="badge b-wait" style="flex-shrink:0">📦 Za slanje</span>'}
         <span class="zav-chevron">▼</span>
@@ -865,10 +671,9 @@ async function renderZavrseni() {
             🏙️ ${addr.city}<br>
             📞 ${addr.tel}
           </div>
+          ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2)">Kupac: <b style="color:var(--text)">${buyer.name}</b></div>` : ''}
         </div>` : '<div style="font-size:13px;color:var(--muted);padding:4px 0">Nema adrese za dostavu.</div>'}
-        ${buyer ? `<div class="divider"></div><div style="font-size:12px;color:var(--muted2)">Kupac: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${acc.buyer_id||acc.id},'${buyer.name}')">${buyer.name}</b></div>` : ''}
       </div>
-      ${rateBtn ? `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">${rateBtn}</div>` : ''}
       <div class="zav-check-wrap">
         <input type="checkbox" id="chk-${l.id}" ${isPoslato?'checked':''} onchange="togglePoslato(${l.id},this.checked)">
         <label class="zav-check-label" for="chk-${l.id}">Označeno kao poslato</label>
@@ -885,41 +690,18 @@ function toggleZav(lid) {
 async function togglePoslato(lid, checked) {
   try {
     await api('PUT', '/listings/'+lid+'/status', { status: checked ? 'sent' : 'finished' });
-    if (checked) poslatoSet.add(lid); else poslatoSet.delete(lid);
+    if (checked) poslatoSet.add(lid);
+    else poslatoSet.delete(lid);
     invalidateListingsCache();
-    const card = document.getElementById('zav-'+lid);
-    if (card) {
-      if (checked) {
-        card.classList.add('poslato');
-        card.classList.remove('open'); // sakrij adresu
-        const badge = card.querySelector('.zav-header .badge');
-        if (badge) { badge.textContent = '✅ Poslato'; badge.className = 'badge b-ok'; badge.style.flexShrink='0'; }
-      } else {
-        card.classList.remove('poslato');
-        card.classList.add('open'); // prikaži adresu
-        const badge = card.querySelector('.zav-header .badge');
-        if (badge) { badge.textContent = '📦 Za slanje'; badge.className = 'badge b-wait'; badge.style.flexShrink='0'; }
-      }
-    }
-  } catch(err) {
+    renderZavrseni();
+  } catch(err) { 
+    // Vrati checkbox na staro stanje ako API fail
     const chk = document.getElementById('chk-'+lid);
     if (chk) chk.checked = !checked;
-    toast('❌ ' + err.message, 'err');
+    toast('❌ ' + err.message, 'err'); 
   }
 }
 
-
-function parseListing(l) {
-  return {
-    ...l,
-    uid: l.user_id,
-    thumb: l.images && l.images.length ? l.images[0] : null,
-    createdAt: new Date(l.created_at).getTime(),
-    ponude: l.my_ponude || [],
-    lot_items: Array.isArray(l.lot_items) ? l.lot_items
-      : (typeof l.lot_items === 'string' && l.lot_items ? JSON.parse(l.lot_items) : [])
-  };
-}
 
 function renderBuyerPage() {
   const pend = CU.status==='pending';
@@ -933,10 +715,14 @@ async function renderBuyerListings() {
   try {
     invalidateListingsCache();
     const data = await cachedListings();
-    LISTINGS = data.map(parseListing);
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(),
+      ponude: l.my_ponude || []
+    }));
     // Sync my ponude
     allMyPonude[CU.id] = LISTINGS.flatMap(l =>
-      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime(), createdAt: p.created_at ? new Date(p.created_at).getTime() : 0 }))
+      (l.my_ponude||[]).map(p => ({ lid: l.id, pid: p.id, cijena: p.cijena, dani: p.dani, status: p.status||'pending', expiresAt: new Date(p.expires_at).getTime() }))
     );
   } catch(e) { toast('Greška pri učitavanju', 'err'); return; }
   // Sakrij oglas čim je buyer ikad poslao ponudu (bez obzira na status)
@@ -944,7 +730,7 @@ async function renderBuyerListings() {
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
-    el.innerHTML = await renderMetalWidget() + `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
     return;
   }
   // Limit bar
@@ -970,72 +756,39 @@ async function renderBuyerListings() {
     }
   }
   const postarina = `<div class="postarina-bar">ℹ️ <b>Napomena:</b> Otkupljivač snosi sve troškove poštarine i transporta.</div>`;
-  const metalWidget = await renderMetalWidget();
   const moze = canBid();
-  const PG = 20;
-  const pg = window._buyerOglasiPage || 0;
-  const paginated = active.slice(0, (pg + 1) * PG);
-  const hasMore = active.length > paginated.length;
-  el.innerHTML = limitBar + metalWidget + postarina + `<div class="oglas-list">` + paginated.map(l => {
+  el.innerHTML = limitBar + postarina + `<div class="oglas-list">` + active.map(l => {
     const seller = getOwner(l);
-    const isLot = l.listing_type === 'lot';
-    const lotItems = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
-    const lotCount = lotItems.length;
-    const lotPreview = lotItems.slice(0,3).map(i=>i.broj).filter(Boolean).join(', ') + (lotItems.length > 3 ? '...' : '');
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'♻️'}</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">🔧</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
-    const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
-    const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
-    // Provjeri status moje ponude za ovaj oglas
-    const myP = getMyPonude().find(p => p.lid === l.id);
-    const myStatus = myP ? myP.status : null;
-    let ponudaBtn;
-    if (!moze) {
-      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
-    } else if (myStatus === 'pending') {
-      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.6;cursor:default">⏳ Ponuda poslana</button>`;
-    } else if (myStatus === 'accepted') {
-      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.6;cursor:default">✅ Prihvaćena</button>`;
-    } else if (myStatus === 'rejected') {
-      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default">❌ Odbijena</button>`;
-    } else if (myStatus === 'expired') {
-      ponudaBtn = `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default">⏰ Istekla</button>`;
-    } else {
-      ponudaBtn = `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${isLot ? 'Lot '+lotCount+' kom' : jsAttr(l.marka+' '+l.model)}')">` + oglasBtnLabel + `</button>`;
-    }
+    const expW = !l.ponude.length && rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
+    const ponudaBtn = moze
+      ? `<button class="btn btn-green btn-sm" onclick="openPonudaOv(${l.id},'${l.marka} ${l.model}')">📤 Ponuda</button>`
+      : `<button class="btn btn-ghost btn-sm" style="opacity:.5;cursor:default" onclick="openPremiumInfo()">🚫 Limit</button>`;
     return `<div class="oglas-card">
       ${thumb}
       <div class="oglas-body">
-        ${isLot
-          ? `<div class="oglas-title" style="cursor:pointer" onclick="event.stopPropagation();openLotDetail(${l.id})">
-               <span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-right:5px;vertical-align:middle">LOT</span>
-               📦 ${lotCount} katalizatora
-               <span style="font-size:11px;color:var(--orange);margin-left:4px">▸ detalji</span>
-             </div>`
-          : `<div class="oglas-title">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god ? ' (' + escapeHtml(String(l.god)) + ')' : ''}</div>`
-        }
+        <div class="oglas-title">${l.marka} ${l.model}${l.god ? ' (' + l.god + ')' : ''}</div>
         <div class="oglas-badges">
-          ${!isLot && l.broj ? `<span class="badge b-blue">Nr. ${escapeHtml(l.broj)}</span>` : ''}
-          ${!isLot ? `<span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>` : ''}
-          ${isLot && lotPreview ? `<span style="font-size:11px;color:var(--muted2);cursor:pointer" onclick="event.stopPropagation();openLotDetail(${l.id})">OEM: ${lotPreview}</span>` : ''}
+          ${l.broj ? `<span class="badge b-blue">Nr. ${l.broj}</span>` : ''}
+          <span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted2)">${l.stanje}</span>
           ${expW}
           <span style="font-size:11px;color:var(--muted)">📅 ${fmtDate(l.createdAt)}</span>
         </div>
-        ${l.nap ? `<div class="oglas-nap">${escapeHtml(l.nap)}</div>` : ''}
+        ${l.nap ? `<div class="oglas-nap">${l.nap}</div>` : ''}
         <div class="oglas-footer">
-          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b>${l.sales_count > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${l.sales_count})</span>` : ''}</div>
+          <div class="oglas-seller">📍 <b>${seller.city || '—'}</b> &nbsp;·&nbsp; 👤 <b>${seller.name}</b></div>
           <div class="oglas-actions">
-            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${isLot?'Lot '+lotCount+' kom':jsAttr(l.marka+' '+l.model)}')">💬 Poruka</button>
+            <button class="btn btn-ghost btn-sm" onclick="openChat(${l.id},'${l.marka} ${l.model}')">💬 Poruka</button>
             ${ponudaBtn}
           </div>
         </div>
       </div>
     </div>`;
-  }).join('') + '</div>' +
-  (hasMore ? `<div style="text-align:center;margin:16px 0"><button class="btn btn-ghost" onclick="window._buyerOglasiPage=(window._buyerOglasiPage||0)+1;renderBuyerListings()">Učitaj još (${active.length - paginated.length})</button></div>` : '');
+  }).join('') + '</div>';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1047,11 +800,11 @@ function openPonudaOvMin(lid, naziv, minCijena) {
   const inp = document.getElementById('pon-iznos');
   if (inp) {
     inp.min = minCijena + 1;
-    inp.placeholder = 'Min. ' + (minCijena + 1) + ' ' + curr(CU && CU.country);
+    inp.placeholder = 'Min. ' + (minCijena + 1) + ' KM';
   }
   // Dodaj info o minimumu
   const sub = document.getElementById('pon-sub');
-  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' ' + curr(CU && CU.country);
+  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' KM';
 }
 
 function openPonudaOv(lid, naziv) {
@@ -1061,8 +814,6 @@ function openPonudaOv(lid, naziv) {
   document.getElementById('pon-iznos').value = '';
   document.getElementById('pon-iznos').min = '';
   document.getElementById('pon-iznos').placeholder = 'npr. 150';
-  const curEl = document.getElementById('pon-curr');
-  if (curEl) curEl.textContent = curr(CU && CU.country);
   const subEl = document.getElementById('pon-sub');
   if (subEl) subEl.textContent = 'Unesite iznos vaše ponude';
   // Postavi default dana iz profila
@@ -1076,17 +827,17 @@ function openPonudaOv(lid, naziv) {
 }
 function ponudaPreview() {
   const v=document.getElementById('pon-iznos').value;
-  document.getElementById('pon-prev-iznos').textContent=v?v+' '+curr(CU && CU.country):'—';
+  document.getElementById('pon-prev-iznos').textContent=v?v+' KM':'—';
 }
 function ponudaNext() {
   const c=parseFloat(document.getElementById('pon-iznos').value);
   if (!c||c<1) { toast('Unesite iznos ponude','err'); return; }
   const inp = document.getElementById('pon-iznos');
   const minVal = parseFloat(inp.min||0);
-  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' ' + curr(CU && CU.country), 'err'); return; }
+  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' KM', 'err'); return; }
   const l=LISTINGS.find(x=>x.id===_ponudaLid);
   const dani = parseInt(document.getElementById('pon-dani').value)||3;
-  document.getElementById('pon-prev-iznos').textContent=c+' '+curr(CU && CU.country);
+  document.getElementById('pon-prev-iznos').textContent=c+' KM';
   document.getElementById('pon-prev-naziv').textContent=(l?l.marka+' '+l.model:'')+(l?' · '+getOwner(l).name:'');
   const daniTxt = dani===1?'1 dan':dani+' dana';
   document.getElementById('pon-prev-dani').textContent='⏱ Vrijedi '+daniTxt+' od slanja';
@@ -1114,8 +865,8 @@ async function ponudaConfirm() {
     closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
     invalidateListingsCache();
     await renderBuyerListings();
-    bTab('oglasi');
-    toast('✅ Ponuda '+c+' '+curr(CU && CU.country)+' poslana!','ok');
+    bTab('moje');
+    toast('✅ Ponuda '+c+' KM poslana!','ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   }
@@ -1130,7 +881,10 @@ async function renderBuyerZavrseni() {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
     const data = await api('GET', '/listings'); // forsiraj svjež fetch
-    LISTINGS = data.map(parseListing);
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || []
+    }));
   } catch(e) { el.innerHTML = '<div class="empty"><p>Greška.</p></div>'; return; }
 
   // Oglasi gdje je moja ponuda prihvaćena
@@ -1145,22 +899,6 @@ async function renderBuyerZavrseni() {
   }
 
   const sortedFinished = [...myFinished].sort((a,b) => b.createdAt - a.createdAt);
-
-  // Provjeri koje su već ocijenjene
-  let buyerRatedSet = new Set();
-  let buyerRatingMap = {};
-  try {
-    const checks = await Promise.all(
-      sortedFinished.map(l => api('GET', '/ratings/check/' + l.id).catch(() => ({ rated: false })))
-    );
-    sortedFinished.forEach((l, i) => {
-      if (checks[i].rated) {
-        buyerRatedSet.add(l.id);
-        buyerRatingMap[l.id] = checks[i].rating;
-      }
-    });
-  } catch(e) {}
-
   el.innerHTML = sortedFinished.map(l => {
     const acc = (l.my_ponude||[]).find(p => p.status === 'accepted');
     const seller = getOwner(l);
@@ -1168,33 +906,25 @@ async function renderBuyerZavrseni() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallB = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '♻️';
-    const isPoslato = l.status === 'sent';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '🔧';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div class="s-oglas-thumb" style="width:56px;height:56px;font-size:22px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
           <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}📍 ${seller.city}</div>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' '+lcurr(l):''}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' KM':''}</div>
       </div>
-      ${isPoslato
-        ? `<span class="badge b-blue" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">📬 Katalizator je poslat!</span>
-           <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:8px;padding:14px;font-size:13px;color:var(--muted2)">
-             Prodavač je označio da je katalizator poslan. Očekujte isporuku uskoro.
-           </div>`
-        : `<span class="badge b-ok" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">✅ Ponuda prihvaćena</span>
-           <div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:14px">
-             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Katalizator se šalje na vašu adresu</div>
-             <div style="font-size:13px;color:var(--muted2);line-height:2">
-               ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : '<span style="color:var(--muted)">Adresa nije unesena u profilu</span>'}
-             </div>
-           </div>`
-      }
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Prodavač: <b style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="openUserProfile(${l.uid||l.user_id},'${seller.name}')">${seller.name}</b> · 📞 ${seller.tel}</span>
-        <button class="btn btn-ghost btn-sm" id="rate-btn-${l.id}" ${buyerRatedSet.has(l.id)?`disabled style="opacity:.5"`:''} onclick="checkAndRate(${l.uid||l.user_id},${l.id},'${jsAttr(l.marka+' '+l.model)}',this)">${buyerRatedSet.has(l.id) ? '⭐ Ocijenjeno ' + (buyerRatingMap[l.id] ? '★'.repeat(buyerRatingMap[l.id].stars)+'☆'.repeat(5-buyerRatingMap[l.id].stars) : '') : '⭐ Ocijeni prodavača'}</button>
+      <span class="badge b-ok" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">✅ Ponuda prihvaćena</span>
+      <div style="background:var(--gL);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:14px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);margin-bottom:8px">📦 Katalizator se šalje na vašu adresu</div>
+        <div style="font-size:13px;color:var(--muted2);line-height:2">
+          ${myAddr ? `<b style="color:var(--text)">${myAddr.name}</b><br>📌 ${myAddr.addr}<br>🏙️ ${myAddr.city}<br>📞 ${myAddr.tel}` : '<span style="color:var(--muted)">Adresa nije unesena u profilu</span>'}
+        </div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted2)">
+        Prodavač: <b style="color:var(--text)">${seller.name}</b> · 📞 ${seller.tel}
       </div>
     </div>`;
   }).join('');
@@ -1210,36 +940,31 @@ function renderMyPonude() {
     el.innerHTML=`<div class="empty"><div class="empty-icon">📤</div><h3>Niste još slali ponude</h3><p>Idite na Aktivni oglasi.</p></div>`;
     return;
   }
-  const sortedPonude = [...ponudeList].sort((a,b) => (b.createdAt||b.expiresAt||0) - (a.createdAt||a.expiresAt||0));
-  const PG = 20;
-  const pg = window._buyerPonudePage || 0;
-  const paginated = sortedPonude.slice(0, (pg + 1) * PG);
-  const hasMore = sortedPonude.length > paginated.length;
-  el.innerHTML = paginated.map(mp=>{
+  const sortedPonude = [...ponudeList].sort((a,b) => (b.expiresAt||0) - (a.expiresAt||0));
+  el.innerHTML=sortedPonude.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
-    const p = l.ponude.find(x => x.id === mp.pid);
+    const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
-    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : status==='expired' ? 'var(--muted)' : 'var(--yellow)';
-    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : status==='expired' ? '⏰ Istekla' : '⏳ Na čekanju';
+    const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : 'var(--yellow)';
+    const stText  = status==='accepted' ? '✅ Prihvaćena' : status==='declined' ? '❌ Odbijena' : '⏳ Na čekanju';
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
     const thumb = thumbSrc
       ? `<img src="${thumbSrc}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0" onclick="${gallJS}">`
-      : `<span style="font-size:20px">♻️</span>`;
+      : `<span style="font-size:20px">🔧</span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
       ${thumb}
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} ${lcurr(l)} · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
+        <div style="font-size:13px;font-weight:700">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM</div>
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
     </div>`;
   }).join('');
   // Wrap u card
-  el.innerHTML = `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;overflow:hidden">${el.innerHTML}</div>` +
-    (hasMore ? `<div style="text-align:center;margin:12px 0"><button class="btn btn-ghost" onclick="window._buyerPonudePage=(window._buyerPonudePage||0)+1;renderMyPonude()">Učitaj još (${sortedPonude.length - paginated.length})</button></div>` : '');
+  el.innerHTML = `<div style="background:var(--dark);border:1px solid var(--border);border-radius:10px;overflow:hidden">${el.innerHTML}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1281,7 +1006,6 @@ async function loadChatMsgs(lid) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
-      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     // Spremi buyer_id za seller odgovor (prva poruka koja nije od sellera)
@@ -1294,16 +1018,6 @@ async function loadChatMsgs(lid) {
   renderChatMsgs();
 }
 
-function chatDateLabel(ts) {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / 86400000);
-  if (diffDays === 0) return 'Danas';
-  if (diffDays === 1) return 'Jučer';
-  if (diffDays < 7) return d.toLocaleDateString('bs', { weekday: 'long' });
-  return d.toLocaleDateString('bs', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 function renderChatMsgs() {
   const msgs = chatHistory[chatLid] || [];
   const el = document.getElementById('chat-msgs');
@@ -1311,7 +1025,6 @@ function renderChatMsgs() {
     el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Pošaljite prvu poruku</div>';
     return;
   }
-  let lastDate = null;
   el.innerHTML = msgs.map((m, i) => {
     const isMe = m.senderId === CU.id;
     const prev = msgs[i-1];
@@ -1321,21 +1034,9 @@ function renderChatMsgs() {
     const avColor = isMe ? avCol(CU.id) : avCol(theirId);
     const avText  = isMe ? initials(CU.name) : initials(theirName||'?');
     const content = m.imgUrl
-      ? `<img class="bubble-img" src="${escapeHtml(m.imgUrl)}" onclick="openLightbox('${jsAttr(m.imgUrl)}')">`
-      : escapeHtml(m.msg).split('\n').join('<br>');
-
-    // Date separator
-    const msgDate = m.ts ? new Date(m.ts).toDateString() : null;
-    let dateSep = '';
-    if (msgDate && msgDate !== lastDate) {
-      lastDate = msgDate;
-      dateSep = `<div style="text-align:center;margin:12px 0 8px;font-size:11px;color:var(--muted);position:relative">
-        <span style="background:var(--dark);padding:0 10px;position:relative;z-index:1">${chatDateLabel(m.ts)}</span>
-        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);z-index:0"></div>
-      </div>`;
-    }
-
-    return `${dateSep}<div class="bubble-wrap ${isMe?'me':''}">
+      ? `<img class="bubble-img" src="${m.imgUrl}" onclick="openLightbox('${m.imgUrl}')">`
+      : m.msg.split('\n').join('<br>');
+    return `<div class="bubble-wrap ${isMe?'me':''}">
       ${!isMe?`<div class="bubble-av" style="background:${avColor};${showAv?'':'opacity:0;pointer-events:none'}">${avText}</div>`:''}
       <div class="bubble ${isMe?'me':'them'}">${content}<span class="bubble-time">${m.time}</span></div>
     </div>`;
@@ -1489,37 +1190,21 @@ function openLightbox(src, gallery) {
   if (_lbIdx < 0) _lbIdx = 0;
   _lbRender();
   document.getElementById('lightbox').classList.add('on');
-  _pushBack(() => closeLightbox());
+  // Dodaj history entry da back dugme zatvori lightbox
+  history.pushState({ lightbox: true }, '');
 }
 
 function closeLightbox() {
   const lb = document.getElementById('lightbox');
   if (!lb || !lb.classList.contains('on')) return;
   lb.classList.remove('on');
-  _lbGallery = []; _lbIdx = 0; _lbScale = 1;
-  const img = document.getElementById('lightbox-img');
-  if (img) { img.classList.remove('zoomed'); img.style.transform = 'scale(1)'; }
-}
-
-let _lbScale = 1;
-
-function lbZoom(dir) {
-  _lbScale = Math.min(4, Math.max(0.5, _lbScale + dir * 0.5));
-  const img = document.getElementById('lightbox-img');
-  if (img) img.style.transform = `scale(${_lbScale})`;
-}
-
-function lbZoomReset() {
-  _lbScale = 1;
-  const img = document.getElementById('lightbox-img');
-  if (img) img.style.transform = 'scale(1)';
+  _lbGallery = []; _lbIdx = 0;
+  // Ukloni history entry od lightboxa
+  if (history.state && history.state.lightbox) history.back();
 }
 
 function lbNav(dir) {
   _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
-  _lbScale = 1;
-  const img = document.getElementById('lightbox-img');
-  if (img) { img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
   _lbRender();
 }
 
@@ -1537,6 +1222,15 @@ function _lbRender() {
 // Zatvori klik na pozadinu
 document.addEventListener('click', e => {
   if (e.target.id === 'lightbox') closeLightbox();
+});
+// Back dugme zatvara lightbox
+window.addEventListener('popstate', e => {
+  const lb = document.getElementById('lightbox');
+  if (lb && lb.classList.contains('on')) {
+    lb.classList.remove('on');
+    _lbGallery = []; _lbIdx = 0;
+    // Ne pozivaj closeLightbox() da izbjegnemo rekurziju
+  }
 });
 // Strelice na tastaturi
 document.addEventListener('keydown', e => {
@@ -1600,27 +1294,18 @@ function openProfil() {
   const vB=u.premium?`<span class="badge b-orange">⭐ Premium${untilStr}</span>`:''; const premB='';
   const premiumBlock = (u.role === 'buyer' && !u.premium) ? `
     <div class="divider"></div>
-    <div style="background:linear-gradient(135deg,#0a0e18,#060d0a);border:1.5px solid rgba(244,196,48,.25);border-radius:10px;padding:18px;margin-top:4px">
+    <div style="background:#fff8f0;border:1.5px solid rgba(244,119,46,.25);border-radius:10px;padding:18px;margin-top:4px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:20px">🔓</span>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--yellow)">Postani Premium otkupljivač</div>
+        <span style="font-size:20px">⭐</span>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--orange)">Postani Premium otkupljivač</div>
       </div>
-      <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
-        Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
-        Godišnja pretplata: <b style="color:var(--text)">${curr(u.country)==='EUR' ? '60 EUR/god (5 EUR/mj)' : '120 KM/god (10 KM/mj)'}</b>
+      <div style="font-size:13px;color:#444;line-height:1.7;margin-bottom:14px">
+        Premium status povećava povjerenje prodavača i daje ti neograničene ponude svaki dan.<br>
+        Godišnja pretplata: <b style="color:#111">${curr(u.country)==='EUR' ? '60 EUR/god (5 EUR/mj)' : '120 KM/god (10 KM/mj)'}</b>
       </div>
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
-        <b style="color:var(--text)">Načini uplate:</b><br>
-        💳 <b style="color:var(--text)">Virman / Uplata:</b><br>
-        &nbsp;&nbsp;Berza Katalizatora d.o.o.<br>
-        &nbsp;&nbsp;IBAN: <b style="color:var(--text)">BA39 1234 5678 9012 3456</b><br>
-        &nbsp;&nbsp;Svrha: <b style="color:var(--text)">Premium – ${u.email}</b><br><br>
-        ₿ <b style="color:var(--text)">Crypto (USDT TRC20):</b><br>
-        &nbsp;&nbsp;<span style="word-break:break-all;color:var(--text);font-size:11px">TRx9Kdemo...wallet</span><br>
-        &nbsp;&nbsp;Pošalji potvrdu na: <b style="color:var(--text)">admin@berza.ba</b>
-      </div>
-      <div style="background:var(--yL);border:1px solid rgba(244,196,48,.2);border-radius:6px;padding:9px 12px;font-size:12px;color:var(--yellow)">
-        ⚠️ Nakon uplate pošalji potvrdu na admin@berza.ba — aktivacija unutar 24h.
+      <div style="background:#fff;border:1px solid rgba(244,119,46,.2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:13px;color:#444;margin-bottom:8px">Za aktivaciju Premium naloga, kontaktirajte nas:</div>
+        <a href="mailto:berzakatalizatora@gmail.com" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--orange);text-decoration:none">✉️ berzakatalizatora@gmail.com</a>
       </div>
     </div>` : (u.role === 'buyer' && u.premium) ? `
     <div class="divider"></div>
@@ -1641,15 +1326,15 @@ function openProfil() {
   document.getElementById('profil-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div style="width:48px;height:48px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;color:#fff">${initials(u.name)}</div>
-      <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${escapeHtml(u.name)}</div>
-      <div style="font-size:12px;color:var(--muted2);margin-top:2px">${escapeHtml(u.email)} · ${roleLabel} ${stB} ${vB}</div></div>
+      <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${u.name}</div>
+      <div style="font-size:12px;color:var(--muted2);margin-top:2px">${u.email} · ${roleLabel} ${stB} ${vB}</div></div>
     </div>
     <div class="divider"></div>
     <div class="row2">
-      <div class="fg"><label>${u.entity==='firma'?'Naziv firme':'Korisničko ime'} <span style="color:var(--muted);font-weight:400">(ne može se mijenjati)</span></label><input value="${escapeHtml(u.name)||''}" disabled style="opacity:.6;cursor:not-allowed"></div>
+      <div class="fg"><label>Ime / Naziv</label><input id="p-name" value="${u.name||''}"></div>
       <div class="fg"><label>Grad</label>
         <div class="ac-wrap">
-          <input id="p-city" value="${escapeHtml(u.city)||''}" placeholder="Upiši grad..." autocomplete="off">
+          <input id="p-city" value="${u.city||''}" placeholder="Upiši grad..." autocomplete="off">
           <div class="ac-list" id="ac-p-city"></div>
         </div>
       </div>
@@ -1660,23 +1345,10 @@ function openProfil() {
     <div class="fg">
       <label>Default period važenja ponude</label>
       <select id="p-default-dani">
-        ${[2,3,4,5,6,7].map(d=>`<option value="${d}" ${(u.defaultDana||3)===d?'selected':''}>${d} dana</option>`).join('')}
+        ${[1,2,3,4,5,6,7].map(d=>`<option value="${d}" ${(u.defaultDana||3)===d?'selected':''}>${d} ${d===1?'dan':'dana'}</option>`).join('')}
       </select>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Ovo će biti automatski odabran period kad šalješ ponudu</div>
     </div>` : ''}
-    <div class="divider"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div>
-        <div style="font-size:13px;font-weight:600">📧 Email notifikacije</div>
-        <div style="font-size:11px;color:var(--muted)">Primaj email pri novim porukama i ponudama</div>
-      </div>
-      <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
-        <input type="checkbox" id="p-email-notify" ${u.emailNotify!==false?'checked':''} onchange="toggleEmailNotify(this.checked)" style="opacity:0;width:0;height:0;position:absolute">
-        <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:${u.emailNotify!==false?'var(--green)':'var(--border2)'};border-radius:24px;transition:.3s">
-          <span style="position:absolute;height:18px;width:18px;left:${u.emailNotify!==false?'23':'3'}px;bottom:3px;background:#fff;border-radius:50%;transition:.3s"></span>
-        </span>
-      </label>
-    </div>
     <button class="btn btn-primary btn-sm" onclick="saveProfile()">💾 Sačuvaj</button>
     ${premiumBlock}
   `;
@@ -1696,6 +1368,7 @@ function openProfil() {
   }, 50);
 }
 function saveProfile() {
+  CU.name=document.getElementById('p-name').value.trim()||CU.name;
   CU.city=document.getElementById('p-city').value.trim();
   CU.addr=document.getElementById('p-addr').value.trim();
   CU.tel =document.getElementById('p-tel').value.trim();
@@ -1723,27 +1396,11 @@ function showConfirm(title,msg,okLabel,cb) {
 // ═══════════════════════════════════════════════════════
 // ADMIN
 // ═══════════════════════════════════════════════════════
-let adminFilterRole = 'all';
-let adminFilterCountry = 'all';
-
 function setAdminFilter(f) {
-  adminFilterRole = f;
-  ['all','seller','buyer','pending'].forEach(x=>{
+  adminFilter=f;
+  ['all','seller','buyer'].forEach(x=>{
     const b=document.getElementById('af-'+x);
-    if(b) b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost');
-  });
-  // Poseban stil za pending
-  const pb = document.getElementById('af-pending');
-  if (pb && f !== 'pending') pb.style.cssText = 'border-color:var(--yellow);color:var(--yellow)';
-  else if (pb) pb.style.cssText = '';
-  renderAdminUsers();
-}
-
-function setAdminCountry(c) {
-  adminFilterCountry = c;
-  ['all','BA','RS'].forEach(x=>{
-    const b=document.getElementById('afc-'+x);
-    if(b) b.className='btn btn-xs '+(x===c?'btn-primary':'btn-ghost');
+    if(b){ b.className='btn btn-xs '+(x===f?'btn-primary':'btn-ghost'); }
   });
   renderAdminUsers();
 }
@@ -1758,21 +1415,8 @@ async function renderAdminUsers() {
       defaultDana: u.default_dana || 3
     }));
   } catch(e) { toast('Greška pri učitavanju korisnika', 'err'); return; }
-  let list=USERS.filter(u=>u.role!=='admin');
-  if (adminFilterRole === 'pending') {
-    list = list.filter(u => u.status === 'pending');
-  } else {
-    if (adminFilterRole !== 'all') list = list.filter(u => u.role === adminFilterRole);
-    if (adminFilterCountry !== 'all') list = list.filter(u => (u.country||'BA').toUpperCase() === adminFilterCountry);
-  }
+  let list=USERS.filter(u=>u.role!=='admin'&&(adminFilter==='all'||u.role===adminFilter));
   if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.city||'').toLowerCase().includes(q));
-
-  // Ažuriraj pending badge
-  const pendingCount = USERS.filter(u => u.role !== 'admin' && u.status === 'pending').length;
-  const pcBadge = document.getElementById('pending-count-badge');
-  const adminBadgeEl = document.getElementById('admin-badge');
-  if (pcBadge) { pcBadge.textContent = pendingCount; pcBadge.style.display = pendingCount > 0 ? 'inline' : 'none'; }
-  if (adminBadgeEl) { adminBadgeEl.textContent = pendingCount; adminBadgeEl.style.display = pendingCount > 0 ? 'inline' : 'none'; }
   const pend=list.filter(u=>u.status==='pending');
   const rest=list.filter(u=>u.status!=='pending');
   const badge=document.getElementById('admin-badge');
@@ -1789,7 +1433,7 @@ async function renderAdminUsers() {
     h+=rest.map(adminCard).join('');
   }
   if(!list.length) h=`<div class="empty"><div class="empty-icon">🔍</div><h3>Nema rezultata</h3></div>`;
-  document.getElementById('a-users').innerHTML = `<div class="admin-users-grid">${h}</div>`;
+  document.getElementById('a-users').innerHTML=h;
 }
 
 function adminCard(u) {
@@ -1814,15 +1458,16 @@ function adminCard(u) {
 
   }
   ddItems.push(`<div class="admin-dd-sep"></div>`);
-  return `<div class="admin-card" id="ac-${u.id}" onclick="toggleUserDetail('${u.id}')" style="cursor:pointer;padding:8px 10px">
-    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-      <div class="admin-av" style="background:${col};width:32px;height:32px;font-size:12px;flex-shrink:0">${initials(u.name)}</div>
-      <div style="min-width:0;flex:1">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">${escapeHtml(u.name)} ${rB} ${sB} ${pB}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.fullname ? `<span style="color:var(--muted2)">${escapeHtml(u.fullname)}</span> · ` : ''}${escapeHtml(u.email)} · ${escapeHtml(u.city)||'—'} · ${escapeHtml(u.tel)||'—'}</div>
+  const acts = ''; const verifyBtn = '';
+  return `<div class="admin-card" id="ac-${u.id}" onclick="toggleUserDetail('${u.id}')" style="cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+      <div class="admin-av" style="background:${col}">${initials(u.name)}</div>
+      <div style="min-width:0">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${u.name} ${rB} ${sB} ${vB} ${pB}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}${u.entity?' · '+(u.entity==='firma'?'🏢 Firma':'👤 Fizičko lice'):''}</div>
       </div>
     </div>
-    <div style="flex-shrink:0;margin-left:6px">
+    <div style="flex-shrink:0">
       <div class="admin-dd" id="add-${u.id}" onclick="event.stopPropagation()">
         <button class="admin-dd-btn" onclick="toggleAdminDD('${u.id}')">Akcije ▾</button>
         <div class="admin-dd-menu">${ddItems.join('')}</div>
@@ -1844,17 +1489,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.admin-dd')) closeAdminDD();
 });
 
-function openPremiumInfo() {
-  // Cijene po zemlji korisnika
-  const rs = CU && String(CU.country).toUpperCase() === 'RS';
-  const m = document.getElementById('prem-price-month');
-  const y = document.getElementById('prem-price-year');
-  if (m) m.innerHTML = rs
-    ? '60 <small style="font-size:16px;font-weight:400;color:var(--muted)">EUR / godišnje</small>'
-    : '120 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / godišnje</small>';
-  if (y) y.textContent = rs ? '(5 EUR / mjesec)' : '(10 KM / mjesec)';
-  document.getElementById('ov-premium').classList.add('on');
-}
+function openPremiumInfo() { document.getElementById('ov-premium').classList.add('on'); }
 
 async function admSetPremium(uid, val) {
   try {
@@ -1925,11 +1560,15 @@ async function toggleUserDetail(uid) {
   } catch(e) {}
 
   let h=`<div style="padding:4px 0">`;
-  h+=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">
-    ${u.fullname ? `<span style="color:var(--text);font-weight:600">${escapeHtml(u.fullname)}</span> &nbsp;·&nbsp; ` : ''}
-    ${u.entity === 'firma' ? '🏢 Firma &nbsp;·&nbsp; ' : u.entity === 'fizicko' ? '👤 Fizičko lice &nbsp;·&nbsp; ' : ''}
-    Registrovan: ${fmtDate(new Date(u.created_at).getTime())}
-    ${u.premium && u.premiumUntil ? ` &nbsp;·&nbsp; <span style="color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</span>` : ''}
+  // ── Info korisnika ──
+  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <div class="admin-av" style="background:${col};width:40px;height:40px;font-size:15px">${initials(u.name)}</div>
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${u.name}</div>
+      <div style="font-size:12px;color:var(--muted2)">${u.email} · 📍 ${u.city||'—'} · 📞 ${u.tel||'—'}</div>
+      <div style="font-size:11px;color:var(--muted)">Registrovan: ${fmtDate(new Date(u.created_at).getTime())}</div>
+      ${u.premium && u.premiumUntil ? `<div style="font-size:11px;color:var(--yellow)">⭐ Premium do: ${fmtDate(u.premiumUntil)}</div>` : ''}
+    </div>
   </div>
   <div class="divider"></div>`;
 
@@ -1942,7 +1581,7 @@ async function toggleUserDetail(uid) {
       const soldDate = l.sold_at ? ' · Prodano: '+fmtDate(new Date(l.sold_at).getTime()) : '';
       return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
         <div style="min-width:0;flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
           <div style="font-size:11px;color:var(--muted)">Dodano: ${fmtDate(new Date(l.created_at).getTime())}${soldDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
@@ -1964,7 +1603,7 @@ async function toggleUserDetail(uid) {
           <div style="font-size:11px;color:var(--muted)">Poslano: ${fmtDate(new Date(p.created_at).getTime())}${respondDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} ${curr(p.country)}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} KM</div>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
@@ -2024,12 +1663,12 @@ async function admViewChat(lid, uid) {
       const time = new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'});
       const dateStr = new Date(m.created_at).toLocaleDateString('bs');
       const txt = m.image_url
-        ? `<img class="bubble-img" src="${escapeHtml(m.image_url)}" onclick="openLightbox('${jsAttr(m.image_url)}')" style="cursor:zoom-in">`
-        : escapeHtml(m.text||'').split('\n').join('<br>');
+        ? `<img class="bubble-img" src="${m.image_url}" onclick="openLightbox('${m.image_url}')" style="cursor:zoom-in">`
+        : (m.text||'').split('\n').join('<br>');
       return `<div class="bubble-wrap ${isOwner?'me':''}">
         ${!isOwner?`<div class="bubble-av" style="background:#8e44ad">${initials(m.sender_name||'?')}</div>`:''}
         <div class="bubble ${isOwner?'me':'them'}">
-          <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px">${escapeHtml(m.sender_name)||'?'} · ${dateStr}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px">${m.sender_name||'?'} · ${dateStr}</div>
           ${txt}<span class="bubble-time">${time}</span>
         </div>
       </div>`;
@@ -2039,8 +1678,42 @@ async function admViewChat(lid, uid) {
     if (chatEl) chatEl.innerHTML = '<div style="padding:16px;color:var(--red)">Greška pri učitavanju</div>';
   }
   return; // Admin pregled — ne nastavljaj dalje
-}
 
+  // Stari kod (nedostižan za admin)
+  const msgs2 = chatHistory[lid] || [];
+  const buyerMsg = msgs2.find(m => m.from === 'buyer');
+  const buyerName = buyerMsg ? (buyerMsg.senderName || 'Otkupljivač') : 'Otkupljivač';
+
+  // Read-only mode — sakrij input, pokaži admin badge
+  const inp = document.getElementById('chat-inp-area');
+  if (inp) inp.style.display = 'none';
+  const adminBadge = document.getElementById('chat-admin-badge');
+  if (adminBadge) adminBadge.style.display = 'flex';
+
+  // Render poruke — prikaži ko je svako
+  const el = document.getElementById('chat-msgs');
+  if (!msgs.length) {
+    el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Nema poruka</div>';
+  } else {
+    el.innerHTML = msgs.map((m, i) => {
+      const isBuyer = m.from === 'buyer';
+      const name = m.senderName || (isBuyer ? 'Otkupljivač' : 'Prodavač');
+      const col = isBuyer ? '#c0392b' : '#e67e22';
+      const prev = msgs[i-1];
+      const showAv = !prev || prev.from !== m.from;
+      const content = m.imgUrl
+        ? `<img class="bubble-img" src="${m.imgUrl}" onclick="openLightbox('${m.imgUrl}')">`
+        : m.msg.split('\n').join('<br>');
+      return `<div class="bubble-wrap ${isBuyer ? 'me' : ''}">
+        ${!isBuyer ? `<div class="bubble-av" style="background:${col};${showAv?'':'opacity:0;pointer-events:none'}">${initials(name)}</div>` : ''}
+        <div class="bubble ${isBuyer ? 'me' : 'them'}">${content}<span class="bubble-time">${m.time}</span></div>
+      </div>`;
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  document.getElementById('ov-chat').classList.add('on');
+}
 
 function admDeleteListing(lid) {
   showConfirm('Obrisati oglas?','Ova akcija ne može se poništiti.','🗑 Da, obriši', async ()=>{
@@ -2058,11 +1731,10 @@ async function renderAnalitika() {
   const el = document.getElementById('a-analitika');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const [users, listings, ponude, topUsers] = await Promise.all([
+    const [users, listings, ponude] = await Promise.all([
       api('GET', '/admin/users'),
       api('GET', '/listings'),
-      api('GET', '/admin/ponude').catch(() => []),
-      api('GET', '/admin/top-users').catch(() => ({ sellers: [], buyers: [] }))
+      api('GET', '/admin/ponude').catch(() => [])
     ]);
 
     const sellers   = users.filter(u => u.role === 'seller');
@@ -2143,8 +1815,8 @@ async function renderAnalitika() {
     const baActive  = activeLi.filter(l => l.country === 'BA');
     const rsActive  = activeLi.filter(l => l.country === 'RS');
 
-    el.innerHTML = `<div style="max-width:760px;margin:0 auto">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         ${statBox('Prodavači', sellers.length, 'var(--orange)')}
         ${statBox('Otkupljivači', buyers.length, 'var(--red)')}
         ${statBox('Na čekanju', pending.length, 'var(--yellow)')}
@@ -2189,203 +1861,63 @@ async function renderAnalitika() {
         ${premiumExpiringSoon.length ? row('Premium ističe za 30 dana', premiumExpiringSoon.length, 'var(--yellow)') : ''}
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
-      `)}
-
-      ${topUsers.sellers && topUsers.sellers.length ? section('🏆 Top 10 prodavača', topUsers.sellers.map((u, i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
-            <div style="font-size:11px;color:var(--muted)">${u.total_listings} oglasa · ${u.sales} prodaja${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
-          </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);flex-shrink:0">${parseFloat(u.revenue).toLocaleString('de-DE')} ${curr(u.country)}</div>
-        </div>
-      `).join('')) : ''}
-
-      ${topUsers.buyers && topUsers.buyers.length ? section('🏆 Top 10 otkupljivača', topUsers.buyers.map((u, i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
-            <div style="font-size:11px;color:var(--muted)">${u.total_ponude} ponuda · ${u.accepted} otkupa${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
-          </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);flex-shrink:0">${parseFloat(u.spent).toLocaleString('de-DE')} ${curr(u.country)}</div>
-        </div>
-      `).join('')) : ''}</div>`;
+      `)}`;
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
   }
 }
 
-async function admToggleOglas(id) {
-  const el = document.getElementById('adm-det-'+id);
-  if (!el) return;
-  const isOpen = el.style.display !== 'none';
-  if (isOpen) { el.style.display = 'none'; return; }
-  el.style.display = 'block';
-  // Fetchuj ponude ako nisu već učitane
-  if (!el.dataset.loaded) {
-    el.dataset.loaded = '1';
-    const ponudeEl = document.getElementById('adm-ponude-'+id);
-    if (ponudeEl) {
-      ponudeEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Učitavam ponude...</span>';
-      try {
-        const ponude = await api('GET', '/admin/listings/'+id+'/ponude');
-        if (!ponude.length) {
-          ponudeEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Nema ponuda.</span>';
-        } else {
-          const accepted = ponude.find(p => p.status === 'accepted');
-          ponudeEl.innerHTML = ponude.map(p => {
-            const isAcc = p.status === 'accepted';
-            const isRej = p.status === 'rejected';
-            const col = isAcc ? 'var(--green)' : isRej ? 'var(--muted)' : 'var(--text)';
-            const badge = isAcc ? '✅' : isRej ? '❌' : '⏳';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
-              <span style="font-size:12px">${badge}</span>
-              <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} ${curr(p.listing_country)}</span>
-              <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
-            </div>`;
-          }).join('');
-        }
-      } catch(e) {
-        ponudeEl.innerHTML = '<span style="color:var(--red);font-size:11px">Greška pri učitavanju ponuda.</span>';
-      }
-    }
-  }
-}
-
 async function renderAdminOglasi() {
-  const el = document.getElementById('a-oglasi');
+  const el=document.getElementById('a-oglasi');
   try {
     const data = await cachedListings();
-    LISTINGS = data.map(parseListing);
+    LISTINGS = data.map(l => ({
+      ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null,
+      createdAt: new Date(l.created_at).getTime(), ponude: []
+    }));
   } catch(e) { toast('Greška', 'err'); return; }
-
-  const PG = 20;
-  const pg = window._adminOglasiPage || 0;
-  const all = LISTINGS;
-  const paginated = all.slice(0, (pg + 1) * PG);
-  const hasMore = all.length > paginated.length;
-
-  el.innerHTML = (paginated.length ? paginated.map(l => {
-    const isLot = l.listing_type === 'lot';
-    const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status==='expired'?'Istekao':'—';
-    const stColor = l.status==='active'?'ok':l.status==='finished'?'ok':l.status==='sent'?'blue':'wait';
-    const stStyle = l.status==='sent' ? 'background:rgba(41,128,185,.15);color:#5dade2;border:1px solid rgba(41,128,185,.3)' : '';
-    return `<div class="admin-oglas-card" id="ac-l-${l.id}">
-      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer" onclick="admToggleOglas(${l.id})">
-        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'♻️')}</div>
+  el.innerHTML=LISTINGS.length?LISTINGS.map(l=>{
+    const stLabel = l.status==='active'?'Aktivan':l.status==='finished'?'Završen':l.status==='sent'?'Poslato':l.status;
+    const stColor = l.status==='active'?'ok':'wait';
+    return `<div class="admin-card" id="ac-l-${l.id}" style="flex-direction:column;gap:0;padding:0;overflow:hidden;cursor:pointer">
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px" onclick="admToggleOglas(${l.id})">
+        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:'🔧'}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
-            ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}
-          </div>
-          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px;${stStyle}">${stLabel}</span></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${l.marka} ${l.model}${l.god?' ('+l.god+')':''}</div>
+          <div style="font-size:11px;color:var(--muted)">📍 ${l.owner_city||'—'} · ${l.ponuda_count||0} ponuda · <span class="badge b-${stColor}" style="font-size:10px">${stLabel}</span></div>
         </div>
         <span style="color:var(--muted);font-size:12px;flex-shrink:0">▼</span>
       </div>
-      <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2)">
-        ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>`'${x}'`).join(',')}])">`).join('')}</div>` : ''; })()}
-        <div style="font-size:12px;line-height:2">
-          ${l.broj?`<b>OEM br.:</b> ${escapeHtml(l.broj)}<br>`:''}
-          ${!isLot?`<b>Stanje:</b> ${l.stanje||'—'}<br>`:''}
-          <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
-          ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${escapeHtml(l.accepted_buyer_name)} (${escapeHtml(l.accepted_buyer_city)||"—"})<br>` : ''}
-          ${l.sold_at ? `<b>Prodano:</b> ${fmtDate(new Date(l.sold_at).getTime())}<br>` : ''}
-          ${l.nap?`<b>Napomena:</b> ${escapeHtml(l.nap)}<br>`:''}
-          <b>Objavljeno:</b> ${fmtDate(new Date(l.created_at||Date.now()).getTime())}
-        </div>
-        ${parseInt(l.ponuda_count) > 0 ? `
-          <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Ponude</div>
-            <div id="adm-ponude-${l.id}"></div>
-          </div>` : ''}
+      <div id="adm-det-${l.id}" style="display:none;border-top:1px solid var(--border);padding:12px;background:rgba(0,0,0,.2);font-size:12px;line-height:2.1">
+        ${(()=>{ const imgs = l.images && l.images.length ? l.images : (l.thumb?[l.thumb]:[]); return imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${imgs.map(u=>`<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${u}',[${imgs.map(x=>'\'' + x + '\'').join(',')}])">`).join('')}</div>` : ''; })()}
+        ${l.broj?`<b>OEM br.:</b> ${l.broj}<br>`:''}
+        <b>Stanje:</b> ${l.stanje||'—'}<br>
+        <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
+        ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${l.accepted_buyer_name} (${l.accepted_buyer_city||'—'})<br>` : ''}
+        ${l.nap?`<b>Napomena:</b> ${l.nap}<br>`:''}
+        <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}<br>
         <div style="margin-top:10px">
           <button class="btn btn-or btn-xs" onclick="event.stopPropagation();admDeleteListing(${l.id})">🗑 Briši oglas</button>
         </div>
       </div>
     </div>`;
-  }).join('') : `<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`) +
-  (hasMore ? `<div style="text-align:center;margin:16px 0"><button class="btn btn-ghost" onclick="window._adminOglasiPage=(window._adminOglasiPage||0)+1;renderAdminOglasi()">Učitaj još (${all.length - paginated.length})</button></div>` : '');
+  }).join(''):`<div class="empty"><div class="empty-icon">📋</div><h3>Nema oglasa</h3></div>`;
+}
+
+function admToggleOglas(id) {
+  const el = document.getElementById('adm-det-'+id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 
 // ═══════════════════════════════════════════════════════
 // NOVI OGLAS (FAB)
 // ═══════════════════════════════════════════════════════
-let _listingType = 'single';
-let _lotRowCount = 0;
-
-function setListingType(type) {
-  _listingType = type;
-  document.getElementById('form-single').style.display = type === 'single' ? '' : 'none';
-  document.getElementById('form-lot').style.display = type === 'lot' ? '' : 'none';
-  document.getElementById('tog-single').className = 'btn btn-sm ' + (type === 'single' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('tog-lot').className = 'btn btn-sm ' + (type === 'lot' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('tog-single').style.flex = '1';
-  document.getElementById('tog-lot').style.flex = '1';
-  if (type === 'lot' && _lotRowCount === 0) {
-    addLotRow(); addLotRow(); addLotRow(); // Start sa 3 reda
-  }
-}
-
-function addLotRow() {
-  const container = document.getElementById('lot-rows');
-  if (!container) return;
-  const count = container.querySelectorAll('.lot-row').length;
-  if (count >= 50) { toast('Maksimalno 50 komada', 'err'); return; }
-  _lotRowCount++;
-  const id = _lotRowCount;
-  const row = document.createElement('div');
-  row.className = 'lot-row';
-  row.id = 'lot-row-' + id;
-  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
-  row.innerHTML = `
-    <div style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${count+1}</div>
-    <input placeholder="OEM broj *" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
-    <select style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 8px;font-family:Barlow,sans-serif;font-size:12px;flex-shrink:0" class="lot-stanje">
-      <option value="Originalni — neoštećen" selected>Originalni</option>
-      <option value="Malo oštećen">Malo oštećen</option>
-      <option value="Zapušen / pokvaren">Zapušen</option>
-      <option value="Nepoznato">Nepoznato</option>
-    </select>
-    <button onclick="removeLotRow('lot-row-${id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;padding:2px 4px">×</button>`;
-  container.appendChild(row);
-  updateLotCount();
-}
-
-function removeLotRow(rowId) {
-  const row = document.getElementById(rowId);
-  if (row) row.remove();
-  // Renumber
-  document.querySelectorAll('.lot-row').forEach((r, i) => {
-    const num = r.querySelector('div');
-    if (num) num.textContent = i + 1;
-  });
-  updateLotCount();
-}
-
-function updateLotCount() {
-  const count = document.querySelectorAll('.lot-row').length;
-  const info = document.getElementById('lot-count-info');
-  if (info) info.textContent = count > 0 ? `${count} katalizatora u lotu` + (count >= 40 ? ` — max 50` : '') : '';
-}
-
-function getLotItems() {
-  const items = [];
-  document.querySelectorAll('.lot-row').forEach(row => {
-    const broj = row.querySelector('.lot-broj')?.value.trim() || '';
-    const stanje = row.querySelector('.lot-stanje')?.value || 'Nepoznato';
-    items.push({ broj, stanje });
-  });
-  return items;
-}
-
 function openNoviOglas() {
+  // Resetuj formu i slike
   uploads = [];
-  _listingType = 'single';
-  _lotRowCount = 0;
   const pg = document.getElementById('prev-grid');
   if (pg) pg.innerHTML = '';
   ['f-broj','f-marka','f-model','f-god','f-nap'].forEach(id => {
@@ -2393,15 +1925,6 @@ function openNoviOglas() {
   });
   const fs = document.getElementById('f-stanje');
   if (fs) fs.selectedIndex = 0;
-  // Reset lot
-  const lotRows = document.getElementById('lot-rows');
-  if (lotRows) lotRows.innerHTML = '';
-  document.getElementById('form-single').style.display = '';
-  document.getElementById('form-lot').style.display = 'none';
-  document.getElementById('tog-single').className = 'btn btn-primary btn-sm';
-  document.getElementById('tog-lot').className = 'btn btn-ghost btn-sm';
-  document.getElementById('tog-single').style.flex = '1';
-  document.getElementById('tog-lot').style.flex = '1';
   document.getElementById('ov-novi').classList.add('on');
 }
 
@@ -2415,7 +1938,7 @@ async function renderPoruke() {
   if (!LISTINGS.length) {
     try {
       const data = await cachedListings();
-      LISTINGS = data.map(parseListing);
+      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: [] }));
     } catch(e) {}
   }
   try {
@@ -2484,8 +2007,8 @@ async function renderPoruke() {
     return `<div class="inbox-item ${unread?'unread':''}" id="ii-${c.lid}" onclick="openSellerChat(${c.lid})">
       <div class="inbox-av" style="background:${buyerCol}">${buyerInit}</div>
       <div style="flex:1;min-width:0">
-        <div class="inbox-name">${escapeHtml(buyerName)}</div>
-        <div class="inbox-preview">${escapeHtml(c.listing.marka)} ${escapeHtml(c.listing.model)} · "${escapeHtml(preview)}"</div>
+        <div class="inbox-name">${buyerName}</div>
+        <div class="inbox-preview">${c.listing.marka} ${c.listing.model} · "${preview}"</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="inbox-time">${last.time}</div>
@@ -2545,7 +2068,6 @@ async function loadChatMsgsWithBuyer(lid, buyerId) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
-      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     chatHistory[lid]._buyerId = buyerId;
@@ -2571,7 +2093,7 @@ async function renderBuyerPoruke() {
   if (!LISTINGS.length) {
     try {
       const data = await cachedListings();
-      LISTINGS = data.map(parseListing);
+      LISTINGS = data.map(l => ({ ...l, uid: l.user_id, thumb: l.images && l.images.length ? l.images[0] : null, createdAt: new Date(l.created_at).getTime(), ponude: l.my_ponude || [] }));
     } catch(e) {}
   }
   // Učitaj inbox iz API-ja
@@ -2626,11 +2148,11 @@ async function renderBuyerPoruke() {
     const preview = last.msg.length > 50 ? last.msg.slice(0,50)+'...' : last.msg;
     const isMyLast = last.senderId === CU.id;
     const unread = hasUnread(c.lid);
-    return `<div class="inbox-item ${unread?'unread':''}" id="bi-${c.lid}" onclick="openChat(${c.lid},'${jsAttr(c.listing.marka+' '+c.listing.model)}')">
+    return `<div class="inbox-item ${unread?'unread':''}" id="bi-${c.lid}" onclick="openChat(${c.lid},'${c.listing.marka} ${c.listing.model}')">
       <div class="inbox-av" style="background:${avCol(seller.id||'x')}">${initials(seller.name)}</div>
       <div style="flex:1;min-width:0">
         <div class="inbox-name">${seller.name}</div>
-        <div class="inbox-preview">${escapeHtml(c.listing.marka)} ${escapeHtml(c.listing.model)} · ${isMyLast?'Ti: ':''}${escapeHtml(preview)}</div>
+        <div class="inbox-preview">${c.listing.marka} ${c.listing.model} · ${isMyLast?'Ti: ':''}${preview}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="inbox-time">${last.time}</div>
@@ -2716,7 +2238,7 @@ function applyTheme(t) {
   currentTheme = t;
   document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : '');
   const btn = document.getElementById('theme-btn');
-  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
+  if (btn) btn.textContent = t === 'light' ? '🌑' : '🌙';
   localStorage.setItem('theme', t);
 }
 
@@ -2829,47 +2351,36 @@ function onCountryChange(countrySelectId, inputId) {
 // Nema JS listenera koji bi interferirao s dugmadima
 
 // ═══════════════════════════════════════════════════════
-// CENTRALNI BACK BUTTON SISTEM
+// BACK BUTTON (Android/browser history)
 // ═══════════════════════════════════════════════════════
-// Stack funkcija za zatvaranje (LIFO). Svaki modal/overlay registrira svoju close funkciju.
-const _backStack = [];
+let navStack = []; // stack stranica/tabova
 
-function _pushBack(closeFn) {
-  _backStack.push(closeFn);
-  history.pushState({ backStack: _backStack.length }, '');
-}
-
-function _popBack() {
-  const fn = _backStack.pop();
-  if (fn) fn();
+function pushNav(state) {
+  history.pushState(state, '');
+  navStack.push(state);
 }
 
 window.addEventListener('popstate', e => {
-  if (_backStack.length > 0) {
-    _popBack();
-    history.pushState({ backStack: _backStack.length }, '');
-    return;
-  }
-  // Fallback — zatvori bilo koji otvoreni .ov overlay
-  const overlays = [...document.querySelectorAll('.ov.on')];
+  // Prvo zatvori bilo koji otvoreni overlay
+  const overlays = document.querySelectorAll('.ov.on');
   if (overlays.length) {
     overlays.forEach(o => o.classList.remove('on'));
-    history.pushState({ backStack: 0 }, '');
+    history.pushState({}, ''); // vrati state da ne izađe iz app
     return;
   }
-  // Nema otvorenih modalova — ostani u app
-  if (CU) {
-    history.pushState({ backStack: 0 }, '');
+  // Inače idi korak unazad u navStacku
+  if (navStack.length > 1) {
+    navStack.pop();
+    const prev = navStack[navStack.length - 1];
+    if (prev) restoreNav(prev);
+  } else {
+    // Na početku — idi na hero/home
+    if (CU) {
+      history.pushState({}, '');
+    }
+    // Ako nema CU, pusti da izađe normalno
   }
 });
-
-// Kompatibilni aliasi za navigacijske funkcije
-function pushNav(state) {
-  history.pushState(state, '');
-}
-
-// Init state pri učitavanju
-history.replaceState({ backStack: 0 }, '');
 
 function restoreNav(state) {
   if (!state) return;
@@ -2911,6 +2422,7 @@ function aTabSilent(n) {
   if (n==='users')  renderAdminUsers();
   if (n==='oglasi') renderAdminOglasi();
   if (n==='analitika') renderAnalitika();
+  if (n==='analitika') renderAnalitika();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2928,7 +2440,7 @@ function sortListings(listings) {
   if (currentSort === 'novo') {
     return copy.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
   } else if (currentSort === 'ponude') {
-    return copy.sort((a,b) => (parseInt(b.ponuda_count)||0) - (parseInt(a.ponuda_count)||0));
+    return copy.sort((a,b) => b.ponude.length - a.ponude.length);
   } else if (currentSort === 'istice') {
     return copy.sort((a,b) => {
       const remA = 7 - Math.floor((Date.now()-(a.createdAt||0))/86400000);
@@ -2946,31 +2458,24 @@ let lastSeenPonude = {}; // lid -> broj ponuda kad je zadnji put gledao
 
 function updateOglasiBadge() {
   if (!CU || CU.role !== 'seller') return;
-  const mine = LISTINGS.filter(l => l.uid === CU.id && l.status === 'active');
-  let totalPending = 0;
+  const mine = LISTINGS.filter(l => l.uid === CU.id);
+  let newCount = 0;
   mine.forEach(l => {
-    const count = parseInt(l._pending_count || 0);
-    const seenKey = 'seen_ponude_' + CU.id + '_' + l.id;
-    const seen = parseInt(localStorage.getItem(seenKey) || '0');
-    if (count > seen) totalPending += (count - seen);
+    const seen = lastSeenPonude[l.id] || 0;
+    const newP = l.ponude.filter(p => p.status === 'pending').length;
+    if (newP > seen) newCount += (newP - seen);
   });
   const b = document.getElementById('oglasi-badge');
-  const bb = document.getElementById('sbn-oglasi-badge');
-  if (b) { b.style.display = totalPending ? 'inline' : 'none'; b.textContent = totalPending || ''; }
-  if (bb) { bb.style.display = totalPending ? 'inline' : 'none'; bb.textContent = totalPending || ''; }
+  if (b) { b.style.display = newCount ? 'inline' : 'none'; b.textContent = newCount; }
 }
 
 function markOglasiSeen() {
   if (!CU) return;
-  LISTINGS.filter(l => l.uid === CU.id && l.status === 'active').forEach(l => {
-    const count = parseInt(l._pending_count || 0);
-    const seenKey = 'seen_ponude_' + CU.id + '_' + l.id;
-    localStorage.setItem(seenKey, String(count));
+  LISTINGS.filter(l => l.uid === CU.id).forEach(l => {
+    lastSeenPonude[l.id] = l.ponude.filter(p => p.status === 'pending').length;
   });
   const b = document.getElementById('oglasi-badge');
-  const bb = document.getElementById('sbn-oglasi-badge');
-  if (b) { b.style.display = 'none'; b.textContent = ''; }
-  if (bb) { bb.style.display = 'none'; bb.textContent = ''; }
+  if (b) b.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2983,528 +2488,8 @@ function toast(msg,type='') {
   clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('on'),3000);
 }
 
-function openLotDetail(lid) {
-  const l = LISTINGS.find(x => x.id === lid);
-  if (!l) return;
-  const items = Array.isArray(l.lot_items) ? l.lot_items : (l.lot_items ? JSON.parse(l.lot_items) : []);
-  const existing = document.getElementById('ov-lot-detail');
-  if (existing) existing.remove();
-  const ov = document.createElement('div');
-  ov.id = 'ov-lot-detail';
-  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding-top:64px;overflow-y:auto';
-  const rows = items.map((it, i) => {
-    const stBadge = it.stanje === 'Originalni — neoštećen'
-      ? `<span style="color:#1db954;font-size:11px">✅ Originalni</span>`
-      : it.stanje === 'Malo oštećen'
-        ? `<span style="color:var(--yellow);font-size:11px">⚠️ Malo oštećen</span>`
-        : it.stanje === 'Zapušen / pokvaren'
-          ? `<span style="color:var(--red);font-size:11px">❌ Zapušen</span>`
-          : `<span style="color:var(--muted);font-size:11px">— Nepoznato</span>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-      <span style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;flex-shrink:0">${i+1}</span>
-      <span style="flex:1;font-size:14px;color:${it.broj?'#fff':'#666'};font-family:'Barlow Condensed',sans-serif;font-weight:${it.broj?700:400};letter-spacing:.3px">${escapeHtml(it.broj) || '— bez OEM broja'}</span>
-      ${stBadge}
-    </div>`;
-  }).join('');
-  ov.innerHTML = `
-    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:420px" onclick="event.stopPropagation()">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div>
-          <span style="background:var(--orange);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-right:8px">LOT</span>
-          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#fff">📦 ${items.length} katalizatora</span>
-        </div>
-        <button onclick="document.getElementById('ov-lot-detail').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1">✕</button>
-      </div>
-      ${l.nap ? `<div style="font-size:12px;color:var(--muted2);background:rgba(255,255,255,.04);border-radius:6px;padding:8px 10px;margin-bottom:12px">📝 ${escapeHtml(l.nap)}</div>` : ''}
-      <div style="max-height:55vh;overflow-y:auto">${rows}</div>
-      <div style="margin-top:14px;display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="document.getElementById('ov-lot-detail').remove()">Zatvori</button>
-        <button class="btn btn-green btn-sm" style="flex:1" onclick="document.getElementById('ov-lot-detail').remove();openPonudaOv(${lid},'Lot ${items.length} kom')">📤 Pošalji ponudu</button>
-      </div>
-    </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if(e.target===ov) { ov.remove(); } });
-  _pushBack(() => ov.remove());
-}
-// ═══════════════════════════════════════════════════════
-async function checkBroadcasts() {
-  try {
-    const broadcasts = await api('GET', '/broadcasts/unread');
-    if (!broadcasts.length) return;
-    // Prikaži jedan po jedan s odgodom
-    broadcasts.reverse().forEach((b, i) => {
-      setTimeout(() => showBroadcast(b), i * 400);
-    });
-  } catch(e) {}
-}
-
-function showBroadcast(b) {
-  const existing = document.getElementById('broadcast-banner');
-  if (existing) existing.remove();
-  const el = document.createElement('div');
-  el.id = 'broadcast-banner';
-  el.style.cssText = `
-    position:fixed;top:0;left:0;right:0;z-index:9999;
-    background:linear-gradient(135deg,#1a0e00,#0a1200);
-    border-bottom:2px solid var(--orange);
-    padding:12px 16px;
-    display:flex;align-items:center;gap:12px;
-    animation:slideDown .3s ease;
-    box-shadow:0 4px 20px rgba(0,0,0,.4);
-  `;
-  el.innerHTML = `
-    <span style="font-size:18px;flex-shrink:0">📢</span>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Obavještenje</div>
-      <div style="font-size:13px;color:#f5a623;line-height:1.4;font-weight:500">${b.message}</div>
-    </div>
-    <button onclick="dismissBroadcast(${b.id})" style="background:none;border:none;color:var(--orange);font-size:20px;cursor:pointer;flex-shrink:0;padding:4px;opacity:.8">✕</button>
-  `;
-  document.body.prepend(el);
-  // Auto-dismiss nakon 10s
-  setTimeout(() => dismissBroadcast(b.id), 10000);
-}
-
-async function dismissBroadcast(id) {
-  const el = document.getElementById('broadcast-banner');
-  if (el) { el.style.opacity='0'; el.style.transform='translateY(-100%)'; el.style.transition='all .3s'; setTimeout(()=>el.remove(), 300); }
-  try { await api('POST', '/broadcasts/'+id+'/read'); } catch(e) {}
-}
-
-// ═══════════════════════════════════════════════════════
-// REJTING SISTEM
-// ═══════════════════════════════════════════════════════
-function starsHtml(avg, total, size='14px') {
-  if (!avg) return `<span style="font-size:11px;color:var(--muted)">Bez ocjene</span>`;
-  const full = Math.floor(avg);
-  const half = (avg - full) >= 0.5;
-  let stars = '';
-  for(let i=1;i<=5;i++) {
-    if(i<=full) stars += `<span style="color:#f4c430;font-size:${size}">★</span>`;
-    else if(i===full+1&&half) stars += `<span style="color:#f4c430;font-size:${size};opacity:.6">★</span>`;
-    else stars += `<span style="color:rgba(255,255,255,.15);font-size:${size}">★</span>`;
-  }
-  return `<span style="display:inline-flex;align-items:center;gap:2px">${stars} <span style="font-size:11px;color:var(--muted);margin-left:3px">${avg} (${total})</span></span>`;
-}
-
-function openRatingModal(toUserId, listingId, listingName) {
-  const existing = document.getElementById('ov-rating');
-  if (existing) existing.remove();
-  const ov = document.createElement('div');
-  ov.id = 'ov-rating';
-  ov.className = 'ov ov-center on';
-  ov.style.cssText = 'z-index:10000';
-  ov.innerHTML = `
-    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:26px 22px;width:100%;max-width:340px;text-align:center;animation:slideUp .22s ease" onclick="event.stopPropagation()">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px;color:#fff">⭐ Ostavi ocjenu</div>
-      <div style="font-size:12px;color:#aaa;margin-bottom:18px">${listingName}</div>
-      <div id="rating-stars" style="display:flex;justify-content:center;gap:4px;margin-bottom:12px">
-        <span data-s="1" onclick="_pickStar(1)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="2" onclick="_pickStar(2)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="3" onclick="_pickStar(3)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="4" onclick="_pickStar(4)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
-        <span data-s="5" onclick="_pickStar(5)" style="font-size:44px;cursor:pointer;color:#555;transition:color .1s;user-select:none;line-height:1">★</span>
-      </div>
-      <div id="rating-label" style="font-size:13px;color:#aaa;margin-bottom:16px;min-height:20px"></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('ov-rating').remove()">Odustani</button>
-        <button class="btn btn-primary" style="flex:1" id="rating-submit-btn" onclick="_submitRating(${toUserId},${listingId})" disabled>Ocijeni</button>
-      </div>
-    </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  _pushBack(() => ov.remove());
-}
-
-const _starLabels = ['','😕 Loše','😐 Ispod prosjeka','🙂 Solidno','😊 Dobro','🤩 Odlično'];
-let _selectedStars = 0;
-
-function _pickStar(n) {
-  _selectedStars = n;
-  document.querySelectorAll('#rating-stars span').forEach(s => {
-    s.style.color = parseInt(s.dataset.s) <= n ? '#f4c430' : 'rgba(255,255,255,.2)';
-  });
-  const lbl = document.getElementById('rating-label');
-  if (lbl) lbl.textContent = _starLabels[n] || '';
-  const btn = document.getElementById('rating-submit-btn');
-  if (btn) btn.disabled = false;
-}
-
-async function _submitRating(toUserId, listingId) {
-  if (!_selectedStars) return;
-  const stars = _selectedStars;
-  const btn = document.getElementById('rating-submit-btn');
-  try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Šaljem...'; }
-    await api('POST', '/ratings', { to_user_id: toUserId, listing_id: listingId, stars });
-    document.getElementById('ov-rating')?.remove();
-    _selectedStars = 0;
-    toast('✅ Ocjena poslana!', 'ok');
-    // Odmah ažuriraj dugme na stranici ispod
-    const rateBtn = document.getElementById('rate-btn-' + listingId);
-    if (rateBtn) {
-      rateBtn.disabled = true;
-      rateBtn.textContent = '⭐ Ocijenjeno ' + '★'.repeat(stars) + '☆'.repeat(5 - stars);
-      rateBtn.style.opacity = '.5';
-    }
-  } catch(err) {
-    toast('❌ ' + err.message, 'err');
-    if (btn) { btn.disabled = false; btn.textContent = 'Ocijeni'; }
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// CIJENE PLEMENITIH METALA (widget)
-// ═══════════════════════════════════════════════════════
-let _metalCache = null;
-let _metalCacheTime = 0;
-
-async function fetchMetalPrices() {
-  const now = Date.now();
-  if (_metalCache && (now - _metalCacheTime) < 6 * 60 * 60 * 1000) return _metalCache; // 6h cache
-  try {
-    const data = await api('GET', '/metal-prices');
-    _metalCache = data;
-    _metalCacheTime = now;
-    return data;
-  } catch(e) {
-    console.error('Metal prices fetch error (frontend):', e.message);
-    return { available: false };
-  }
-}
-
-async function renderMetalWidget() {
-  const data = await fetchMetalPrices();
-  if (!data.available) return '';
-
-  const trendIcon = t => t === 'up' ? '<span style="color:var(--green)">▲</span>' : t === 'down' ? '<span style="color:var(--red)">▼</span>' : '<span style="color:var(--muted)">▬</span>';
-  const fmt = v => v ? v.toLocaleString('de-DE') : '—';
-
-  return `<div style="background:linear-gradient(135deg,rgba(244,196,48,.06),rgba(255,94,20,.04));border:1px solid rgba(244,196,48,.15);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:10px">
-      💹 Cijene metala (€/oz)
-    </div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap">
-      <div><span style="color:var(--muted)">Pt</span> <b style="color:var(--text)">${fmt(data.platinum)}</b> ${trendIcon(data.trends?.platinum)}</div>
-      <div><span style="color:var(--muted)">Pd</span> <b style="color:var(--text)">${fmt(data.palladium)}</b> ${trendIcon(data.trends?.palladium)}</div>
-      ${data.rhodium ? `<div><span style="color:var(--muted)">Rh</span> <b style="color:var(--text)">${fmt(data.rhodium)}</b> ${trendIcon(data.trends?.rhodium)}</div>` : ''}
-    </div>
-  </div>`;
-}
-
-// ═══════════════════════════════════════════════════════
-// PROVJERA OCJENE + KORISNIČKI PROFIL
-// ═══════════════════════════════════════════════════════
-async function checkAndRate(toUserId, listingId, listingName, btn) {
-  try {
-    const res = await api('GET', '/ratings/check/' + listingId);
-    if (res.rated) {
-      if (btn) {
-        const stars = res.rating ? res.rating.stars : 0;
-        const starsStr = stars ? ' ' + '★'.repeat(stars) + '☆'.repeat(5-stars) : '';
-        btn.disabled = true;
-        btn.textContent = `⭐ Ocijenjeno${starsStr}`;
-        btn.style.opacity = '.5';
-      }
-      toast('Već ste ocijenili ovu transakciju.', '');
-      return;
-    }
-    openRatingModal(toUserId, listingId, listingName);
-  } catch(e) {
-    openRatingModal(toUserId, listingId, listingName);
-  }
-}
-
-async function openUserProfile(userId, userName) {
-  const existing = document.getElementById('ov-user-profile');
-  if (existing) existing.remove();
-  const ov = document.createElement('div');
-  ov.id = 'ov-user-profile';
-  // Ne koristimo .ov klasu - sve inline da izbjegnemo CSS konflikte
-  ov.style.cssText = [
-    'position:fixed', 'top:0', 'left:0', 'right:0', 'bottom:0',
-    'z-index:10001', 'background:rgba(0,0,0,.82)', 'backdrop-filter:blur(4px)',
-    'display:flex', 'flex-direction:column', 'align-items:center',
-    'justify-content:flex-start', 'padding-top:64px',
-    'overflow-y:auto', 'overscroll-behavior:contain'
-  ].join(';') + ';';
-  ov.innerHTML = `
-    <div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:22px 20px;width:calc(100% - 32px);max-width:360px;animation:slideUp .22s ease;position:relative" onclick="event.stopPropagation()">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#fff">👤 ${userName}</div>
-        <button id="ov-user-profile-close" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1;padding:4px 8px">✕</button>
-      </div>
-      <div id="user-profile-body" style="color:#aaa;font-size:13px;text-align:center;padding:16px">Učitavam...</div>
-    </div>`;
-  document.body.appendChild(ov);
-  document.getElementById('ov-user-profile-close').addEventListener('click', e => {
-    e.stopPropagation();
-    ov.remove();
-  });
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  _pushBack(() => ov.remove());
-
-  try {
-    const data = await api('GET', '/ratings/' + userId);
-    const col = avCol(String(userId));
-    const body = document.getElementById('user-profile-body');
-    if (!body) return;
-    const avgStars = data.avg_stars || 0;
-    const total = data.total || 0;
-    const sales = data.sales_count || 0;
-
-    // Za otkupljivača fetchaj broj prihvaćenih ponuda (transakcija)
-    let buyerTransactions = data.buyer_transactions || 0;
-
-    let starsStr = '';
-    for(let i=1;i<=5;i++) {
-      starsStr += `<span style="font-size:30px;color:${i<=Math.round(avgStars)?'#f4c430':'#444'}">${i<=Math.round(avgStars)?'★':'☆'}</span>`;
-    }
-    const isBuyer = data.role === 'buyer';
-    const txCount = isBuyer ? buyerTransactions : sales;
-    const txLabel = isBuyer
-      ? (txCount > 0 ? `<div style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#5dade2;margin-top:4px">🛒 ${txCount} kupovina</div>` : '')
-      : (txCount > 0 ? `<div style="background:rgba(29,185,84,.12);border:1px solid rgba(29,185,84,.2);border-radius:8px;padding:8px 16px;font-size:13px;color:#1db954;margin-top:4px">✅ ${txCount} uspješnih prodaja</div>` : '');
-    body.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-        <div style="width:56px;height:56px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;color:#fff">${initials(userName)}</div>
-        <div style="font-size:15px;font-weight:700;color:#fff">${userName}</div>
-        ${avgStars > 0 ? `
-          <div>${starsStr}</div>
-          <div style="font-size:13px;color:#aaa">${avgStars} prosjek · ${total} ${total===1?'ocjena':'ocjena'}</div>
-        ` : `<div style="font-size:13px;color:#555;margin:8px 0">Još nema ocjena</div>`}
-        ${txLabel}
-      </div>`;
-  } catch(e) {
-    const body = document.getElementById('user-profile-body');
-    if (body) body.textContent = 'Nije moguće učitati profil.';
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// ADMIN — BROADCAST SLANJE
-// ═══════════════════════════════════════════════════════
-async function openBroadcastModal() {
-  const existing = document.getElementById('ov-broadcast');
-  if (existing) existing.remove();
-  let histHtml = '';
-  try {
-    const hist = await api('GET', '/admin/broadcasts');
-    histHtml = hist.length ? hist.slice(0,5).map(b=>`
-      <div style="border-top:1px solid var(--border);padding:8px 0;font-size:12px">
-        <div style="color:var(--muted2)">${fmtDate(b.created_at)}</div>
-        <div style="color:var(--text);margin-top:2px">${b.message}</div>
-      </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0">Nema prethodnih obavještenja.</div>';
-  } catch(e) {}
-  const ov = document.createElement('div');
-  ov.id = 'ov-broadcast';
-  ov.className = 'ov ov-center on';
-  ov.innerHTML = `
-    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:24px 20px;width:100%;max-width:420px;animation:slideUp .22s ease">
-      <button onclick="document.getElementById('ov-broadcast').remove()" style="float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;margin-bottom:16px">📢 Broadcast poruka</div>
-      <div class="fg">
-        <label>Poruka svim korisnicima</label>
-        <textarea id="bc-msg" rows="3" placeholder="Unesite obavještenje..." style="width:100%;background:var(--dark);border:1px solid var(--border2);border-radius:7px;color:var(--text);padding:10px;font-family:Barlow,sans-serif;font-size:13px;resize:vertical"></textarea>
-      </div>
-      <button class="btn btn-primary btn-block" onclick="sendBroadcast()">📤 Pošalji svim korisnicima</button>
-      ${histHtml ? `<div style="margin-top:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prethodna obavještenja</div>${histHtml}</div>` : ''}
-    </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-}
-
-async function sendBroadcast() {
-  const msg = document.getElementById('bc-msg')?.value.trim();
-  if (!msg) { toast('Unesite poruku', 'err'); return; }
-  try {
-    await api('POST', '/admin/broadcast', { message: msg });
-    document.getElementById('ov-broadcast')?.remove();
-    toast('✅ Broadcast poslan svim korisnicima!', 'ok');
-  } catch(err) { toast('❌ ' + err.message, 'err'); }
-}
-
-// ═══════════════════════════════════════════════════════
-// EMAIL NOTIFY TOGGLE (u profilu)
-// ═══════════════════════════════════════════════════════
-async function toggleEmailNotify(val) {
-  try {
-    await api('PUT', '/auth/email-notify', { email_notify: val });
-    CU.emailNotify = val;
-    // Vizuelno ažuriraj slider
-    const span = document.querySelector('#p-email-notify + span');
-    const knob = document.querySelector('#p-email-notify + span span');
-    if (span) span.style.background = val ? 'var(--green)' : 'var(--border2)';
-    if (knob) knob.style.left = val ? '23px' : '3px';
-    toast(val ? '✅ Email notifikacije uključene' : 'Email notifikacije isključene', val ? 'ok' : '');
-  } catch(err) { toast('❌ ' + err.message, 'err'); }
-}
-
-// ═══════════════════════════════════════════════════════
-// TERMS & CONDITIONS
-// ═══════════════════════════════════════════════════════
-function openTerms() {
-  const content = document.getElementById('terms-content');
-  if (content && !content.innerHTML) {
-    content.innerHTML = `
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">1. Opšte odredbe</h3>
-<p>Berza Katalizatora (u daljem tekstu: "Platforma") je online tržište koje omogućava fizičkim i pravnim licima (u daljem tekstu: "Korisnici") da objavljuju i pregledaju oglase za prodaju katalizatora i DPF filtera. Platforma je u vlasništvu fizičkog lica sa sjedištem u Bijeljini, Bosna i Hercegovina.</p>
-<p>Korišćenjem Platforme prihvatate ove Uslove u potpunosti. Ako se ne slažete sa bilo kojim dijelom ovih Uslova, molimo vas da ne koristite Platformu.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">2. Opis usluge</h3>
-<p>Platforma pruža isključivo tehnički prostor za objavljivanje oglasa i komunikaciju između prodavača i otkupljivača katalizatora. Berza Katalizatora <strong style="color:var(--text)">nije stranka</strong> u bilo kakvoj transakciji između Korisnika i ne vrši posredovanje u kupoprodaji.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">3. Odricanje od odgovornosti</h3>
-<p><strong style="color:var(--text)">Platforma ne snosi nikakvu odgovornost</strong> za:</p>
-<ul style="padding-left:18px;margin:8px 0">
-  <li style="margin-bottom:6px">Tačnost, potpunost ili istinitost informacija koje Korisnici objavljuju u oglasima</li>
-  <li style="margin-bottom:6px">Kvalitet, stanje, autentičnost ili vrijednost robe koja je predmet oglasa</li>
-  <li style="margin-bottom:6px">Postupke, propuste ili namjere bilo kojeg Korisnika Platforme</li>
-  <li style="margin-bottom:6px">Finansijske gubitke, prevare ili sporove nastale između Korisnika</li>
-  <li style="margin-bottom:6px">Neisporuku robe, neplaćanje ili bilo koji drugi oblik neispunjenja obaveza između Korisnika</li>
-  <li style="margin-bottom:6px">Štetu nastalu usled korišćenja ili nemogućnosti korišćenja Platforme</li>
-</ul>
-<p>Sve transakcije se odvijaju isključivo između Korisnika, na njihovu vlastitu odgovornost.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">4. Obaveze Korisnika</h3>
-<p>Korisnici su dužni da:</p>
-<ul style="padding-left:18px;margin:8px 0">
-  <li style="margin-bottom:6px">Objavljuju isključivo tačne i istinite informacije o robi koju nude</li>
-  <li style="margin-bottom:6px">Ne objavljuju oglase za robu koja je ukradena, falsifikovana ili čija prodaja nije dozvoljena zakonom</li>
-  <li style="margin-bottom:6px">Ne koriste Platformu u svrhe prevare, uznemiravanja ili bilo koje druge protivpravne aktivnosti</li>
-  <li style="margin-bottom:6px">Postupaju u dobroj vjeri prema ostalim Korisnicima</li>
-  <li style="margin-bottom:6px">Preuzmu punu odgovornost za sve obaveze koje preuzmu putem Platforme</li>
-</ul>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">5. Zabranjeni sadržaj</h3>
-<p>Strogo je zabranjeno objavljivanje oglasa koji sadrže: robu nezakonito nabavljenu ili ukradenu, lažne ili manipulativne opise, kontakt podatke trećih lica bez njihovog pristanka, uvredljiv ili diskriminatorni sadržaj. Platforma zadržava pravo da bez prethodne najave ukloni svaki oglas koji smatra neprimjerenim ili koji krši ove Uslove.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">6. Prijava prevare i sporova</h3>
-<p>U slučaju sumnje na prevaru ili bilo koji oblik zloupotrebe, Korisnici su dužni prijaviti incident nadležnim organima (policija, tužilaštvo). Platforma može pružiti administrativnu podršku organima gonjenja dostavljanjem podataka o Korisnicima isključivo na osnovu valjane sudske odluke ili naloga nadležnog organa, u skladu sa važećim zakonodavstvom BiH i Srbije.</p>
-<p>Platforma <strong style="color:var(--text)">ne arbitrira</strong> u sporovima između Korisnika i nije nadležna za rješavanje reklamacija.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">7. Politika privatnosti i zaštita podataka</h3>
-<p>Platforma prikuplja sljedeće lične podatke pri registraciji: ime i prezime, grad, adresa, broj telefona i email adresa. Ovi podaci se koriste isključivo za funkcionisanje Platforme i komunikaciju između Korisnika.</p>
-<p>Platforma ne prodaje, ne iznajmljuje niti ne dijeli lične podatke Korisnika trećim stranama u komercijalne svrhe. Podaci se čuvaju na sigurnom serveru i zaštićeni su standardnim sigurnosnim mjerama.</p>
-<p>Korisnik ima pravo zatražiti brisanje svog naloga i svih povezanih podataka slanjem zahtjeva na: <strong style="color:var(--orange)">berzakatalizatora@gmail.com</strong></p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">8. Kolačići (Cookies)</h3>
-<p>Platforma koristi isključivo funkcionalne kolačiće neophodne za rad (sesija, prijava). Ne koriste se kolačići za praćenje, profilisanje ili oglašavanje.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">9. Izmjene Uslova</h3>
-<p>Platforma zadržava pravo izmjene ovih Uslova u bilo kojem trenutku. Korisnici će biti obaviješteni o značajnim izmjenama putem obavještenja na Platformi. Nastavak korišćenja Platforme nakon objave izmjena smatra se prihvatanjem novih Uslova.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">10. Nadležnost i mjerodavno pravo</h3>
-<p>Na ove Uslove primjenjuje se pravo Bosne i Hercegovine. Za sve sporove koji bi mogli nastati iz korišćenja Platforme nadležan je sud u Bijeljini, Bosna i Hercegovina.</p>
-
-<h3 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);margin:16px 0 6px">11. Kontakt</h3>
-<p>Za sva pitanja u vezi sa ovim Uslovima možete nas kontaktirati na: <strong style="color:var(--orange)">berzakatalizatora@gmail.com</strong></p>
-    `;
-  }
-  document.getElementById('ov-terms').classList.add('on');
-  _pushBack(() => closeOv('ov-terms'));
-}
-
-function acceptTermsAndClose() {
-  const chk = document.getElementById('reg-terms');
-  if (chk) chk.checked = true;
-  closeOv('ov-terms');
-  toast('✅ Uslovi prihvaćeni', 'ok');
-}
-// ═══════════════════════════════════════════════════════
-function initCookieBanner() {
-  if (!localStorage.getItem('cookie_consent')) {
-    setTimeout(() => {
-      const b = document.getElementById('cookie-banner');
-      if (b) b.style.display = 'block';
-    }, 1200);
-  }
-}
-
-function acceptCookies() {
-  localStorage.setItem('cookie_consent', 'all');
-  const b = document.getElementById('cookie-banner');
-  if (b) { b.style.opacity='0'; b.style.transition='opacity .3s'; setTimeout(()=>b.remove(),300); }
-}
-
-function declineCookies() {
-  localStorage.setItem('cookie_consent', 'necessary');
-  const b = document.getElementById('cookie-banner');
-  if (b) { b.style.opacity='0'; b.style.transition='opacity .3s'; setTimeout(()=>b.remove(),300); }
-}
-
-// ═══════════════════════════════════════════════════════
-// SWIPE NAVIGACIJA IZMEĐU TABOVA
-// ═══════════════════════════════════════════════════════
-(function() {
-  const SELLER_TABS = ['oglasi','poruke','zavrseni'];
-  const BUYER_TABS  = ['oglasi','moje','zavrseni','poruke'];
-  const ADMIN_TABS  = ['users','oglasi','analitika'];
-
-  let _sx = 0, _sy = 0;
-
-  function activePage() {
-    if (document.getElementById('page-seller')?.style.display === 'block') return 'seller';
-    if (document.getElementById('page-buyer')?.style.display === 'block') return 'buyer';
-    if (document.getElementById('page-admin')?.style.display === 'block') return 'admin';
-    return null;
-  }
-
-  function currentTab(tabs, prefix) {
-    for (const t of tabs) {
-      const el = document.getElementById(prefix + t);
-      if (el && el.classList.contains('on')) return t;
-    }
-    return tabs[0];
-  }
-
-  function swipeToTab(dir) {
-    const page = activePage();
-    if (!page) return;
-
-    let tabs, prefix, fn;
-    if (page === 'seller') { tabs = SELLER_TABS; prefix = 'sp-'; fn = sTab; }
-    else if (page === 'buyer') { tabs = BUYER_TABS; prefix = 'bp-'; fn = bTab; }
-    else if (page === 'admin') { tabs = ADMIN_TABS; prefix = 'ap-'; fn = aTab; }
-    else return;
-
-    const idx = tabs.indexOf(currentTab(tabs, prefix));
-    const nextTab = tabs[idx + dir];
-    if (!nextTab) return;
-
-    // Animiraj novi tab
-    fn(nextTab);
-    const newPane = document.getElementById(prefix + nextTab);
-    if (newPane) {
-      const cls = dir > 0 ? 'slide-in-left' : 'slide-in-right';
-      newPane.classList.remove('slide-in-left', 'slide-in-right');
-      requestAnimationFrame(() => {
-        newPane.classList.add(cls);
-        setTimeout(() => newPane.classList.remove(cls), 300);
-      });
-    }
-  }
-
-  document.addEventListener('touchstart', e => {
-    if (document.querySelector('.ov.on')) return;
-    _sx = e.touches[0].clientX;
-    _sy = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - _sx;
-    const dy = e.changedTouches[0].clientY - _sy;
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
-    // Ignoriši swipe ako je na chat ili lightbox
-    const tgt = e.target;
-    if (tgt.closest('.chat-msgs,.lightbox,#lightbox')) return;
-    swipeToTab(dx < 0 ? 1 : -1);
-  }, { passive: true });
-})();
-
 // INIT
 initAC('reg-city', 'reg-country');
-initCookieBanner();
 
 // ── PWA Install ──────────────────────────────────────────
 let _installPrompt = null;
