@@ -1491,22 +1491,12 @@ function openLightbox(src, gallery) {
   _lbGallery = gallery && gallery.length ? gallery : [src];
   _lbIdx = _lbGallery.indexOf(src);
   if (_lbIdx < 0) _lbIdx = 0;
-  _lbActive = 'a'; _lbScale = 1;
-  // Postavi početnu sliku direktno bez crossfade
-  const imgA = document.getElementById('lightbox-img-a');
-  const imgB = document.getElementById('lightbox-img-b');
-  if (imgA) { imgA.src = src; imgA.style.opacity = '1'; imgA.style.zIndex = '2'; imgA.style.transform = 'scale(1)'; }
-  if (imgB) { imgB.src = ''; imgB.style.opacity = '0'; imgB.style.zIndex = '1'; }
-  // Prikaz/skrivanje strelica i countera
-  const multi = _lbGallery.length > 1;
-  const prev = document.getElementById('lb-prev');
-  const next = document.getElementById('lb-next');
-  const ctr  = document.getElementById('lb-counter');
-  if (prev) prev.style.display = multi ? 'flex' : 'none';
-  if (next) next.style.display = multi ? 'flex' : 'none';
-  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = '1 / ' + _lbGallery.length; }
-  // Preload sljedeće slike
-  if (_lbGallery.length > 1) { const pre = new Image(); pre.src = _lbGallery[(_lbIdx + 1) % _lbGallery.length]; }
+  _lbScale = 1;
+  const img = document.getElementById('lightbox-img');
+  if (img) { img.src = src; img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
+  _lbUpdateUI();
+  // Preloada susjedne slike u cache
+  _lbPreload(_lbIdx);
   document.getElementById('lightbox').classList.add('on');
   _pushBack(() => closeLightbox());
 }
@@ -1515,78 +1505,74 @@ function closeLightbox() {
   const lb = document.getElementById('lightbox');
   if (!lb || !lb.classList.contains('on')) return;
   lb.classList.remove('on');
-  _lbGallery = []; _lbIdx = 0; _lbScale = 1; _lbActive = 'a';
-  ['a','b'].forEach(x => {
-    const img = document.getElementById('lightbox-img-' + x);
-    if (!img) return;
-    img.src = ''; img.style.transform = 'scale(1)'; img.classList.remove('zoomed');
-    img.style.opacity = x === 'a' ? '1' : '0';
-    img.style.zIndex  = x === 'a' ? '2' : '1';
-  });
+  _lbGallery = []; _lbIdx = 0; _lbScale = 1;
+  const img = document.getElementById('lightbox-img');
+  if (img) { img.classList.remove('zoomed'); img.style.transform = 'scale(1)'; }
 }
 
 let _lbScale = 1;
-let _lbActive = 'a'; // koji img tag je trenutno vidljiv
+const _lbCache = {}; // URL -> Image objekt (preloaded)
 
-function _lbGetActive()   { return document.getElementById('lightbox-img-' + _lbActive); }
-function _lbGetInactive() { return document.getElementById('lightbox-img-' + (_lbActive === 'a' ? 'b' : 'a')); }
+function _lbPreload(idx) {
+  // Preload trenutne + -1/+1
+  [-1, 0, 1].forEach(offset => {
+    const i = (idx + offset + _lbGallery.length) % _lbGallery.length;
+    const url = _lbGallery[i];
+    if (url && !_lbCache[url]) {
+      const pre = new Image();
+      pre.src = url;
+      _lbCache[url] = pre;
+    }
+  });
+}
 
 function lbZoom(dir) {
   _lbScale = Math.min(4, Math.max(0.5, _lbScale + dir * 0.5));
-  const img = _lbGetActive();
+  const img = document.getElementById('lightbox-img');
   if (img) img.style.transform = `scale(${_lbScale})`;
 }
 
 function lbZoomReset() {
   _lbScale = 1;
-  const img = _lbGetActive();
+  const img = document.getElementById('lightbox-img');
   if (img) img.style.transform = 'scale(1)';
 }
 
 function lbNav(dir) {
   _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
   _lbScale = 1;
-  _lbRender();
-  // Preload sljedeće (u smjeru kretanja)
-  if (_lbGallery.length > 2) {
-    const nextIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
-    const pre = new Image(); pre.src = _lbGallery[nextIdx];
+  const newSrc = _lbGallery[_lbIdx];
+  const img = document.getElementById('lightbox-img');
+  if (!img) return;
+  img.style.transform = 'scale(1)';
+  img.classList.remove('zoomed');
+
+  const cached = _lbCache[newSrc];
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    // Slika je već u cache — instantno, bez blica
+    img.src = newSrc;
+  } else {
+    // Nije u cache — učitaj u pozadini, prikaži kad je gotovo
+    img.style.opacity = '0.4';
+    const pre = _lbCache[newSrc] || new Image();
+    _lbCache[newSrc] = pre;
+    pre.onload = () => { img.src = newSrc; img.style.opacity = '1'; };
+    pre.onerror = () => { img.src = newSrc; img.style.opacity = '1'; };
+    if (!pre.src) pre.src = newSrc;
   }
+
+  _lbUpdateUI();
+  _lbPreload(_lbIdx);
 }
 
-function _lbRender() {
-  const newSrc = _lbGallery[_lbIdx];
-  const active   = _lbGetActive();
-  const inactive = _lbGetInactive();
-
-  // Ako je isti src (otvaranje lightboxa) — samo postavi bez animacije
-  if (active && active.src && active.src.endsWith(newSrc.replace(/^.*\/\/[^/]+/, ''))) {
-    // isti — ništa ne radi
-  } else if (inactive) {
-    // Učitaj novu sliku u nevidljivi tag
-    inactive.style.transform = 'scale(1)';
-    inactive.classList.remove('zoomed');
-    inactive.onload = () => {
-      // Swap — nova slika postaje vidljiva bez blica
-      inactive.style.opacity = '1';
-      inactive.style.zIndex  = '2';
-      if (active) { active.style.opacity = '0'; active.style.zIndex = '1'; }
-      _lbActive = (_lbActive === 'a' ? 'b' : 'a');
-    };
-    inactive.onerror = () => { inactive.style.opacity = '1'; inactive.style.zIndex = '2'; if (active) { active.style.opacity='0'; active.style.zIndex='1'; } _lbActive = (_lbActive === 'a' ? 'b' : 'a'); };
-    inactive.src = newSrc;
-  } else if (active) {
-    active.src = newSrc;
-  }
-
-  // Counter i navigacijske strelice
+function _lbUpdateUI() {
   const multi = _lbGallery.length > 1;
   const prev = document.getElementById('lb-prev');
   const next = document.getElementById('lb-next');
   const ctr  = document.getElementById('lb-counter');
   if (prev) prev.style.display = multi ? 'flex' : 'none';
   if (next) next.style.display = multi ? 'flex' : 'none';
-  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx+1) + ' / ' + _lbGallery.length; }
+  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx + 1) + ' / ' + _lbGallery.length; }
 }
 
 // Zatvori klik na pozadinu
