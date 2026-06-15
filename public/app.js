@@ -49,6 +49,7 @@ let chatHistory = {};
 let chatLid = null;
 let _confirmCb = null;
 let _ponudaLid = null;
+let _ponudaListing = null;
 const FREE_DAILY_LIMIT = 10; // max ponuda dnevno za free korisnike
 // dailyBids[userId] = {date:'2024-01-15', count:3}
 const dailyBids = {};
@@ -1046,24 +1047,26 @@ function openPonudaOvMin(lid, naziv, minCijena) {
   openPonudaOv(lid, naziv);
   // Postavi minimum
   const inp = document.getElementById('pon-iznos');
+  const lCurr = lcurr(_ponudaListing);
   if (inp) {
     inp.min = minCijena + 1;
-    inp.placeholder = 'Min. ' + (minCijena + 1) + ' ' + curr(CU && CU.country);
+    inp.placeholder = 'Min. ' + (minCijena + 1) + ' ' + lCurr;
   }
   // Dodaj info o minimumu
   const sub = document.getElementById('pon-sub');
-  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' ' + curr(CU && CU.country);
+  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' ' + lCurr;
 }
 
 function openPonudaOv(lid, naziv) {
   _ponudaLid = lid;
+  _ponudaListing = LISTINGS.find(x => x.id === lid) || null;
   document.getElementById('pon-title').textContent = naziv;
   document.getElementById('pon-sub').textContent = 'Unesite iznos vaše ponude';
   document.getElementById('pon-iznos').value = '';
   document.getElementById('pon-iznos').min = '';
   document.getElementById('pon-iznos').placeholder = 'npr. 150';
   const curEl = document.getElementById('pon-curr');
-  if (curEl) curEl.textContent = curr(CU && CU.country);
+  if (curEl) curEl.textContent = lcurr(_ponudaListing);
   const subEl = document.getElementById('pon-sub');
   if (subEl) subEl.textContent = 'Unesite iznos vaše ponude';
   // Postavi default dana iz profila
@@ -1077,17 +1080,17 @@ function openPonudaOv(lid, naziv) {
 }
 function ponudaPreview() {
   const v=document.getElementById('pon-iznos').value;
-  document.getElementById('pon-prev-iznos').textContent=v?v+' '+curr(CU && CU.country):'—';
+  document.getElementById('pon-prev-iznos').textContent=v?v+' '+lcurr(_ponudaListing):'—';
 }
 function ponudaNext() {
   const c=parseFloat(document.getElementById('pon-iznos').value);
   if (!c||c<1) { toast('Unesite iznos ponude','err'); return; }
   const inp = document.getElementById('pon-iznos');
   const minVal = parseFloat(inp.min||0);
-  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' ' + curr(CU && CU.country), 'err'); return; }
-  const l=LISTINGS.find(x=>x.id===_ponudaLid);
+  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' ' + lcurr(_ponudaListing), 'err'); return; }
+  const l = _ponudaListing || LISTINGS.find(x=>x.id===_ponudaLid);
   const dani = parseInt(document.getElementById('pon-dani').value)||3;
-  document.getElementById('pon-prev-iznos').textContent=c+' '+curr(CU && CU.country);
+  document.getElementById('pon-prev-iznos').textContent=c+' '+lcurr(_ponudaListing);
   document.getElementById('pon-prev-naziv').textContent=(l?l.marka+' '+l.model:'')+(l?' · '+getOwner(l).name:'');
   const daniTxt = dani===1?'1 dan':dani+' dana';
   document.getElementById('pon-prev-dani').textContent='⏱ Vrijedi '+daniTxt+' od slanja';
@@ -1116,7 +1119,7 @@ async function ponudaConfirm() {
     invalidateListingsCache();
     await renderBuyerListings();
     bTab('oglasi');
-    toast('✅ Ponuda '+c+' '+curr(CU && CU.country)+' poslana!','ok');
+    toast('✅ Ponuda '+c+' '+lcurr(_ponudaListing)+' poslana!','ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   }
@@ -1674,6 +1677,7 @@ function openProfil() {
     ${premiumBlock}
   `;
   document.getElementById('ov-profil').classList.add('on');
+  _pushBack(() => closeOv('ov-profil'));
   // Dodaj privremeni country select za profil AC
   setTimeout(() => {
     if (!document.getElementById('p-country-hidden')) {
@@ -1688,17 +1692,29 @@ function openProfil() {
     initAC('p-city', 'p-country-hidden');
   }, 50);
 }
-function saveProfile() {
-  CU.city=document.getElementById('p-city').value.trim();
-  CU.addr=document.getElementById('p-addr').value.trim();
-  CU.tel =document.getElementById('p-tel').value.trim();
-  const dEl=document.getElementById('p-default-dani');
-  if (dEl) { CU.defaultDana=parseInt(dEl.value)||3; defaultDana=CU.defaultDana; }
-  // CU je ažuriran direktno — getBuyerAddr(CU) će automatski koristiti nove podatke
-  document.getElementById('uc-av').textContent=initials(CU.name);
-  document.getElementById('uc-name').textContent=CU.name;
+async function saveProfile() {
+  const city = document.getElementById('p-city').value.trim();
+  const addr = document.getElementById('p-addr').value.trim();
+  const tel  = document.getElementById('p-tel').value.trim();
+  const dEl  = document.getElementById('p-default-dani');
+  const default_dana = dEl ? (parseInt(dEl.value) || 3) : (CU.defaultDana || 3);
+
+  try {
+    const updated = await api('PUT', '/auth/profile', { name: CU.name, city, addr, tel, default_dana });
+    // Merge povratnih podataka u CU (čuva fullname, entity, email_notify itd.)
+    Object.assign(CU, updated);
+    CU.defaultDana = updated.default_dana || default_dana;
+    defaultDana = CU.defaultDana;
+  } catch(e) {
+    // Fallback: ažuriraj lokalno ako API ne uspije
+    CU.city = city; CU.addr = addr; CU.tel = tel;
+    CU.defaultDana = default_dana; defaultDana = default_dana;
+  }
+
+  document.getElementById('uc-av').textContent = initials(CU.name);
+  document.getElementById('uc-name').textContent = CU.name;
   closeOv('ov-profil');
-  toast('✅ Profil ažuriran','ok');
+  toast('✅ Profil ažuriran', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1847,6 +1863,7 @@ function openPremiumInfo() {
     : '120 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / godišnje</small>';
   if (y) y.textContent = rs ? '(5 EUR / mjesec)' : '(10 KM / mjesec)';
   document.getElementById('ov-premium').classList.add('on');
+  _pushBack(() => closeOv('ov-premium'));
 }
 
 async function admSetPremium(uid, val) {
@@ -2390,6 +2407,7 @@ function openNoviOglas() {
   const lotRows = document.getElementById('lot-rows');
   if (lotRows) lotRows.innerHTML = '';
   document.getElementById('ov-novi').classList.add('on');
+  _pushBack(() => closeOv('ov-novi'));
   setListingType('single');
 }
 
