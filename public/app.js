@@ -1071,7 +1071,7 @@ function openPonudaOv(lid, naziv) {
   if (dSel) dSel.value = String(CU && CU.defaultDana ? CU.defaultDana : defaultDana);
   document.getElementById('pon-step1').style.display = '';
   const ovP = document.getElementById('ov-ponuda');
-  if (ovP) { ovP.classList.add('on'); }
+  if (ovP) { ovP.classList.add('on'); _pushBack(() => closeOv('ov-ponuda')); }
   closeOv('ov-confirm-ponuda');
   setTimeout(()=>document.getElementById('pon-iznos').focus(),120);
 }
@@ -1602,27 +1602,18 @@ function openProfil() {
   const premCijena = curr(u.country)==='EUR' ? '60 EUR/god (5 EUR/mj)' : '120 KM/god (10 KM/mj)';
   const premiumBlock = (u.role === 'buyer' && !u.premium) ? `
     <div class="divider"></div>
-    <div style="background:linear-gradient(135deg,#0a0e18,#060d0a);border:1.5px solid rgba(244,196,48,.25);border-radius:10px;padding:18px;margin-top:4px">
+    <div style="background:var(--oL);border:1.5px solid rgba(244,119,46,.25);border-radius:10px;padding:18px;margin-top:4px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:20px">🔓</span>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--yellow)">Postani Premium otkupljivač</div>
+        <span style="font-size:20px">⭐</span>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--orange)">Postani Premium otkupljivač</div>
       </div>
       <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
-        Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
+        Premium status povećava povjerenje prodavača i daje ti neograničene ponude svaki dan.<br>
         Godišnja pretplata: <b style="color:var(--text)">${premCijena}</b>
       </div>
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
-        <b style="color:var(--text)">Načini uplate:</b><br>
-        💳 <b style="color:var(--text)">Virman / Uplata:</b><br>
-        &nbsp;&nbsp;Berza Katalizatora d.o.o.<br>
-        &nbsp;&nbsp;IBAN: <b style="color:var(--text)">BA39 1234 5678 9012 3456</b><br>
-        &nbsp;&nbsp;Svrha: <b style="color:var(--text)">Premium – ${u.email}</b><br><br>
-        ₿ <b style="color:var(--text)">Crypto (USDT TRC20):</b><br>
-        &nbsp;&nbsp;<span style="word-break:break-all;color:var(--text);font-size:11px">TRx9Kdemo...wallet</span><br>
-        &nbsp;&nbsp;Pošalji potvrdu na: <b style="color:var(--text)">admin@berza.ba</b>
-      </div>
-      <div style="background:var(--yL);border:1px solid rgba(244,196,48,.2);border-radius:6px;padding:9px 12px;font-size:12px;color:var(--yellow)">
-        ⚠️ Nakon uplate pošalji potvrdu na admin@berza.ba — aktivacija unutar 24h.
+      <div style="background:var(--panel);border:1px solid rgba(244,119,46,.2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Za aktivaciju Premium naloga, kontaktirajte nas:</div>
+        <a href="mailto:berzakatalizatora@gmail.com" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--orange);text-decoration:none">✉️ berzakatalizatora@gmail.com</a>
       </div>
     </div>` : (u.role === 'buyer' && u.premium) ? `
     <div class="divider"></div>
