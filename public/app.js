@@ -1368,7 +1368,8 @@ function openProfil() {
   }, 50);
 }
 function saveProfile() {
-  CU.name=document.getElementById('p-name').value.trim()||CU.name;
+  const nameEl = document.getElementById('p-name');
+  if (nameEl && !nameEl.disabled) CU.name = nameEl.value.trim() || CU.name;
   CU.city=document.getElementById('p-city').value.trim();
   CU.addr=document.getElementById('p-addr').value.trim();
   CU.tel =document.getElementById('p-tel').value.trim();
