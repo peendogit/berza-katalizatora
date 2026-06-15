@@ -49,6 +49,7 @@ let chatHistory = {};
 let chatLid = null;
 let _confirmCb = null;
 let _ponudaLid = null;
+let _ponudaListing = null;
 const FREE_DAILY_LIMIT = 10; // max ponuda dnevno za free korisnike
 // dailyBids[userId] = {date:'2024-01-15', count:3}
 const dailyBids = {};
@@ -102,6 +103,10 @@ let unreadLids = new Set(); // lid-ovi sa nepročitanim porukama
 // UTILS
 // ═══════════════════════════════════════════════════════
 const getU     = id => USERS.find(u => String(u.id) === String(id));
+// Valuta po zemlji: BA = KM, RS = EUR
+const curr = c => (String(c||'').toUpperCase() === 'RS') ? 'EUR' : 'KM';
+const lcurr = l => curr(l && l.country);
+// Valuta po zemlji: BA = KM, RS = EUR
 const getOwner = l  => ({ id: l.user_id||l.uid||'x', name: escapeHtml(l.owner_name)||'Nepoznat', city: escapeHtml(l.owner_city)||'—', tel: escapeHtml(l.owner_tel)||'—' });
 const initials = n  => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const avColors = ['#c0392b','#16a085','#8e44ad','#2980b9','#e67e22','#27ae60','#d35400'];
@@ -223,6 +228,7 @@ async function doRegister() {
   const addr  = document.getElementById('reg-addr').value.trim();
   const tel   = document.getElementById('reg-tel').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const country = (document.getElementById('reg-country')?.value || 'ba').toUpperCase();
   const pass  = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
   if (!document.getElementById('reg-terms')?.checked) {
@@ -230,13 +236,14 @@ async function doRegister() {
     return;
   }
   if (!name) { toast('Unesite korisničko ime / naziv firme', 'err'); return; }
+  if (!addr) { toast('Unesite adresu', 'err'); return; }
   if (selEntity === 'fizicko' && !fullname) { toast('Unesite ime i prezime', 'err'); return; }
   if (pass.length < 6) { toast('Lozinka min. 6 znakova', 'err'); return; }
   if (pass !== pass2) { toast('Lozinke se ne podudaraju', 'err'); return; }
   try {
     const btn = document.getElementById('reg-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Registracija...'; }
-    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity });
+    const { user, token } = await api('POST', '/auth/register', { email, password: pass, name, fullname, city, addr, tel, role: selRole, entity: selEntity, country });
     localStorage.setItem('token', token);
     if (user.status === 'pending') {
       const existing = document.getElementById('ov-pending');
@@ -270,6 +277,8 @@ async function doRegister() {
 }
 
 function loginUser(u) {
+  // Brisi frontend cache pri svaku novom loginu
+  invalidateListingsCache();
   // Blokira pending korisnike
   if (u.status === 'pending') {
     localStorage.removeItem('token');
@@ -336,7 +345,9 @@ async function tryAutoLogin() {
   const token = localStorage.getItem('token');
   if (!token) return;
   try {
-    const user = await api('GET', '/auth/me');
+    const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) { localStorage.removeItem('token'); return; }
+    const user = await res.json();
     loginUser(user);
   } catch {
     localStorage.removeItem('token');
@@ -495,10 +506,13 @@ async function submitListing() {
   const btn = document.getElementById('btn-submit-oglas');
   if (!isLot) {
     const marka = document.getElementById('f-marka').value.trim();
+    const broj = document.getElementById('f-broj').value.trim();
     if (!marka) { toast('Unesite marku vozila', 'err'); return; }
+    if (!broj) { toast('Unesite OEM broj katalizatora', 'err'); return; }
   } else {
     const items = getLotItems();
     if (!items.length) { toast('Dodajte barem jedan katalizator u lot', 'err'); return; }
+    if (items.some(i => !i.broj)) { toast('Svaki katalizator u lotu mora imati OEM broj', 'err'); return; }
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Objavljujem...'; }
   const _reEnableBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '📤 Objavi oglas'; } };
@@ -599,7 +613,7 @@ async function renderMyListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();${gallS}">` : '♻️';
     const rem = 7 - Math.floor((Date.now()-l.createdAt)/86400000);
     const soldDate = l.sold_at ? fmtDate(new Date(l.sold_at).getTime()) : '';
     return `<div class="s-oglas-card" onclick="togglePP(${l.id})">
@@ -634,7 +648,7 @@ async function renderMyListings() {
       ${expired.map(l => {
         const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
         const thumbSrc = imgs[0] || null;
-        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '🔧';
+        const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.5">` : '♻️';
         return `<div class="s-oglas-card" style="opacity:.65">
           <div class="s-oglas-body">
             <div class="s-oglas-thumb">${thumb}</div>
@@ -728,7 +742,7 @@ function buildPonudeList(l) {
             <span style="cursor:pointer;text-decoration:underline" onclick="openUserProfile(${p.buyerId},'${buyerName.replace(/'/g,"\\'")}')"> ${buyerName}</span>${p.buyerTx > 0 ? ` <span style="font-size:11px;color:var(--muted);font-weight:400">(${p.buyerTx})</span>` : ''}
             ${verB} ${stB}
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} KM</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} ${lcurr(l)}</div>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">ističe ${(() => { const rem = Math.ceil((p.expiresAt - Date.now()) / 86400000); return rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'; })()}</span>` : ''}</div>
         ${telB}${msgB}
@@ -827,7 +841,7 @@ async function renderZavrseni() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" loading="lazy" style="cursor:zoom-in;width:100%;height:100%;object-fit:cover" onclick="${gallJS}">` : '♻️';
     const isPoslato = poslatoSet.has(l.id);
     const isOpen = !isPoslato; // poslato su zatvorene, ostale otvorene
 
@@ -838,7 +852,7 @@ async function renderZavrseni() {
         <div class="s-oglas-thumb" style="width:52px;height:52px;font-size:20px;flex-shrink:0">${thumb}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' KM':''}</div>
+          <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${acc?acc.cijena+' '+lcurr(l):''}</div>
         </div>
         ${isPoslato ? '<span class="badge b-ok" style="flex-shrink:0">✅ Poslato</span>' : '<span class="badge b-wait" style="flex-shrink:0">📦 Za slanje</span>'}
         <span class="zav-chevron">▼</span>
@@ -932,7 +946,7 @@ async function renderBuyerListings() {
   const activeRaw = LISTINGS.filter(l => l.status==='active' && !blockedLids.includes(l.id));
   const active = sortListings(activeRaw);
   if (!active.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
+    el.innerHTML = await renderMetalWidget() + `<div class="empty"><div class="empty-icon">📋</div><h3>Nema aktivnih oglasa</h3></div>`;
     return;
   }
   // Limit bar
@@ -973,7 +987,7 @@ async function renderBuyerListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'🪙'}</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'♻️'}</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
@@ -1033,22 +1047,26 @@ function openPonudaOvMin(lid, naziv, minCijena) {
   openPonudaOv(lid, naziv);
   // Postavi minimum
   const inp = document.getElementById('pon-iznos');
+  const lCurr = lcurr(_ponudaListing);
   if (inp) {
     inp.min = minCijena + 1;
-    inp.placeholder = 'Min. ' + (minCijena + 1) + ' KM';
+    inp.placeholder = 'Min. ' + (minCijena + 1) + ' ' + lCurr;
   }
   // Dodaj info o minimumu
   const sub = document.getElementById('pon-sub');
-  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' KM';
+  if (sub) sub.textContent = 'Nova ponuda mora biti veća od ' + minCijena + ' ' + lCurr;
 }
 
 function openPonudaOv(lid, naziv) {
   _ponudaLid = lid;
+  _ponudaListing = LISTINGS.find(x => x.id === lid) || null;
   document.getElementById('pon-title').textContent = naziv;
   document.getElementById('pon-sub').textContent = 'Unesite iznos vaše ponude';
   document.getElementById('pon-iznos').value = '';
   document.getElementById('pon-iznos').min = '';
   document.getElementById('pon-iznos').placeholder = 'npr. 150';
+  const curEl = document.getElementById('pon-curr');
+  if (curEl) curEl.textContent = lcurr(_ponudaListing);
   const subEl = document.getElementById('pon-sub');
   if (subEl) subEl.textContent = 'Unesite iznos vaše ponude';
   // Postavi default dana iz profila
@@ -1056,23 +1074,23 @@ function openPonudaOv(lid, naziv) {
   if (dSel) dSel.value = String(CU && CU.defaultDana ? CU.defaultDana : defaultDana);
   document.getElementById('pon-step1').style.display = '';
   const ovP = document.getElementById('ov-ponuda');
-  if (ovP) { ovP.classList.add('on'); }
+  if (ovP) { ovP.classList.add('on'); _pushBack(() => closeOv('ov-ponuda')); }
   closeOv('ov-confirm-ponuda');
   setTimeout(()=>document.getElementById('pon-iznos').focus(),120);
 }
 function ponudaPreview() {
   const v=document.getElementById('pon-iznos').value;
-  document.getElementById('pon-prev-iznos').textContent=v?v+' KM':'—';
+  document.getElementById('pon-prev-iznos').textContent=v?v+' '+lcurr(_ponudaListing):'—';
 }
 function ponudaNext() {
   const c=parseFloat(document.getElementById('pon-iznos').value);
   if (!c||c<1) { toast('Unesite iznos ponude','err'); return; }
   const inp = document.getElementById('pon-iznos');
   const minVal = parseFloat(inp.min||0);
-  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' KM', 'err'); return; }
-  const l=LISTINGS.find(x=>x.id===_ponudaLid);
+  if (minVal > 0 && c <= minVal) { toast('Ponuda mora biti veća od ' + minVal + ' ' + lcurr(_ponudaListing), 'err'); return; }
+  const l = _ponudaListing || LISTINGS.find(x=>x.id===_ponudaLid);
   const dani = parseInt(document.getElementById('pon-dani').value)||3;
-  document.getElementById('pon-prev-iznos').textContent=c+' KM';
+  document.getElementById('pon-prev-iznos').textContent=c+' '+lcurr(_ponudaListing);
   document.getElementById('pon-prev-naziv').textContent=(l?l.marka+' '+l.model:'')+(l?' · '+getOwner(l).name:'');
   const daniTxt = dani===1?'1 dan':dani+' dana';
   document.getElementById('pon-prev-dani').textContent='⏱ Vrijedi '+daniTxt+' od slanja';
@@ -1100,8 +1118,8 @@ async function ponudaConfirm() {
     closeOv('ov-ponuda'); closeOv('ov-confirm-ponuda');
     invalidateListingsCache();
     await renderBuyerListings();
-    bTab('moje');
-    toast('✅ Ponuda '+c+' KM poslana!','ok');
+    bTab('oglasi');
+    toast('✅ Ponuda '+c+' '+lcurr(_ponudaListing)+' poslana!','ok');
   } catch(err) {
     toast('❌ ' + err.message, 'err');
   }
@@ -1154,7 +1172,7 @@ async function renderBuyerZavrseni() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const gallB = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`\'${u}\'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '🔧';
+    const thumb = thumbSrc ? `<img src="${thumbSrc}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="${gallB}">` : '♻️';
     const isPoslato = l.status === 'sent';
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
@@ -1163,7 +1181,7 @@ async function renderBuyerZavrseni() {
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
           <div style="font-size:12px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}📍 ${seller.city}</div>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' KM':''}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--green);flex-shrink:0">${acc?acc.cijena+' '+lcurr(l):''}</div>
       </div>
       ${isPoslato
         ? `<span class="badge b-blue" style="font-size:13px;padding:4px 12px;margin-bottom:12px;display:inline-block">📬 Katalizator je poslat!</span>
@@ -1203,7 +1221,7 @@ function renderMyPonude() {
   const hasMore = sortedPonude.length > paginated.length;
   el.innerHTML = paginated.map(mp=>{
     const l=LISTINGS.find(x=>x.id===mp.lid); if(!l) return '';
-    const p=l.ponude.find(x=>x.buyerId===CU.id && x.cijena===mp.cijena) || l.ponude.find(x=>x.id===mp.pid);
+    const p = l.ponude.find(x => x.id === mp.pid);
     const rawStatus = p ? p.status : mp.status || 'pending';
     const status = rawStatus === 'rejected' ? 'declined' : rawStatus;
     const stColor = status==='accepted' ? 'var(--green)' : status==='declined' ? 'var(--red)' : status==='expired' ? 'var(--muted)' : 'var(--yellow)';
@@ -1213,12 +1231,12 @@ function renderMyPonude() {
     const gallJS = imgs.length ? `openLightbox(this.src,[${imgs.map(u=>`'${u}'`).join(',')}])` : '';
     const thumb = thumbSrc
       ? `<img src="${thumbSrc}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0" onclick="${gallJS}">`
-      : `<span style="font-size:20px">🔧</span>`;
+      : `<span style="font-size:20px">♻️</span>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
       ${thumb}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}</div>
-        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} KM · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.broj?'Nr. '+l.broj+' · ':''}${mp.cijena} ${lcurr(l)} · ${mp.createdAt ? fmtDate(mp.createdAt) : ''}</div>
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;flex-shrink:0">${stText}</span>
     </div>`;
@@ -1267,6 +1285,7 @@ async function loadChatMsgs(lid) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
+      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     // Spremi buyer_id za seller odgovor (prva poruka koja nije od sellera)
@@ -1279,6 +1298,16 @@ async function loadChatMsgs(lid) {
   renderChatMsgs();
 }
 
+function chatDateLabel(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return 'Danas';
+  if (diffDays === 1) return 'Jučer';
+  if (diffDays < 7) return d.toLocaleDateString('bs', { weekday: 'long' });
+  return d.toLocaleDateString('bs', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function renderChatMsgs() {
   const msgs = chatHistory[chatLid] || [];
   const el = document.getElementById('chat-msgs');
@@ -1286,6 +1315,7 @@ function renderChatMsgs() {
     el.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div>Pošaljite prvu poruku</div>';
     return;
   }
+  let lastDate = null;
   el.innerHTML = msgs.map((m, i) => {
     const isMe = m.senderId === CU.id;
     const prev = msgs[i-1];
@@ -1297,7 +1327,19 @@ function renderChatMsgs() {
     const content = m.imgUrl
       ? `<img class="bubble-img" src="${escapeHtml(m.imgUrl)}" onclick="openLightbox('${jsAttr(m.imgUrl)}')">`
       : escapeHtml(m.msg).split('\n').join('<br>');
-    return `<div class="bubble-wrap ${isMe?'me':''}">
+
+    // Date separator
+    const msgDate = m.ts ? new Date(m.ts).toDateString() : null;
+    let dateSep = '';
+    if (msgDate && msgDate !== lastDate) {
+      lastDate = msgDate;
+      dateSep = `<div style="text-align:center;margin:12px 0 8px;font-size:11px;color:var(--muted);position:relative">
+        <span style="background:var(--dark);padding:0 10px;position:relative;z-index:1">${chatDateLabel(m.ts)}</span>
+        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);z-index:0"></div>
+      </div>`;
+    }
+
+    return `${dateSep}<div class="bubble-wrap ${isMe?'me':''}">
       ${!isMe?`<div class="bubble-av" style="background:${avColor};${showAv?'':'opacity:0;pointer-events:none'}">${avText}</div>`:''}
       <div class="bubble ${isMe?'me':'them'}">${content}<span class="bubble-time">${m.time}</span></div>
     </div>`;
@@ -1449,7 +1491,12 @@ function openLightbox(src, gallery) {
   _lbGallery = gallery && gallery.length ? gallery : [src];
   _lbIdx = _lbGallery.indexOf(src);
   if (_lbIdx < 0) _lbIdx = 0;
-  _lbRender();
+  _lbScale = 1;
+  const img = document.getElementById('lightbox-img');
+  if (img) { img.src = src; img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
+  _lbUpdateUI();
+  // Preloada susjedne slike u cache
+  _lbPreload(_lbIdx);
   document.getElementById('lightbox').classList.add('on');
   _pushBack(() => closeLightbox());
 }
@@ -1464,6 +1511,20 @@ function closeLightbox() {
 }
 
 let _lbScale = 1;
+const _lbCache = {}; // URL -> Image objekt (preloaded)
+
+function _lbPreload(idx) {
+  // Preload trenutne + -1/+1
+  [-1, 0, 1].forEach(offset => {
+    const i = (idx + offset + _lbGallery.length) % _lbGallery.length;
+    const url = _lbGallery[i];
+    if (url && !_lbCache[url]) {
+      const pre = new Image();
+      pre.src = url;
+      _lbCache[url] = pre;
+    }
+  });
+}
 
 function lbZoom(dir) {
   _lbScale = Math.min(4, Math.max(0.5, _lbScale + dir * 0.5));
@@ -1480,20 +1541,38 @@ function lbZoomReset() {
 function lbNav(dir) {
   _lbIdx = (_lbIdx + dir + _lbGallery.length) % _lbGallery.length;
   _lbScale = 1;
+  const newSrc = _lbGallery[_lbIdx];
   const img = document.getElementById('lightbox-img');
-  if (img) { img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
-  _lbRender();
+  if (!img) return;
+  img.style.transform = 'scale(1)';
+  img.classList.remove('zoomed');
+
+  const cached = _lbCache[newSrc];
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    // Slika je već u cache — instantno, bez blica
+    img.src = newSrc;
+  } else {
+    // Nije u cache — učitaj u pozadini, prikaži kad je gotovo
+    img.style.opacity = '0.4';
+    const pre = _lbCache[newSrc] || new Image();
+    _lbCache[newSrc] = pre;
+    pre.onload = () => { img.src = newSrc; img.style.opacity = '1'; };
+    pre.onerror = () => { img.src = newSrc; img.style.opacity = '1'; };
+    if (!pre.src) pre.src = newSrc;
+  }
+
+  _lbUpdateUI();
+  _lbPreload(_lbIdx);
 }
 
-function _lbRender() {
-  document.getElementById('lightbox-img').src = _lbGallery[_lbIdx];
+function _lbUpdateUI() {
   const multi = _lbGallery.length > 1;
   const prev = document.getElementById('lb-prev');
   const next = document.getElementById('lb-next');
   const ctr  = document.getElementById('lb-counter');
   if (prev) prev.style.display = multi ? 'flex' : 'none';
   if (next) next.style.display = multi ? 'flex' : 'none';
-  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx+1) + ' / ' + _lbGallery.length; }
+  if (ctr)  { ctr.style.display = multi ? 'block' : 'none'; ctr.textContent = (_lbIdx + 1) + ' / ' + _lbGallery.length; }
 }
 
 // Zatvori klik na pozadinu
@@ -1560,29 +1639,21 @@ function openProfil() {
   const stB=u.status==='approved'?'<span class="badge b-ok">✅ Aktivan</span>':'<span class="badge b-wait">⏳ Na čekanju</span>';
   const untilStr = u.premiumUntil ? ' do '+fmtDate(u.premiumUntil) : '';
   const vB=u.premium?`<span class="badge b-orange">⭐ Premium${untilStr}</span>`:''; const premB='';
+  const premCijena = curr(u.country)==='EUR' ? '60 EUR/god (5 EUR/mj)' : '120 KM/god (10 KM/mj)';
   const premiumBlock = (u.role === 'buyer' && !u.premium) ? `
     <div class="divider"></div>
-    <div style="background:linear-gradient(135deg,#0a0e18,#060d0a);border:1.5px solid rgba(244,196,48,.25);border-radius:10px;padding:18px;margin-top:4px">
+    <div style="background:var(--oL);border:1.5px solid rgba(244,119,46,.25);border-radius:10px;padding:18px;margin-top:4px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:20px">🔓</span>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--yellow)">Postani Premium otkupljivač</div>
+        <span style="font-size:20px">⭐</span>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--orange)">Postani Premium otkupljivač</div>
       </div>
       <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px">
-        Premium status povećava povjerenje prodavača i daje ti prioritet u listi ponuda i neograničene ponude.<br>
-        Godišnja pretplata: <b style="color:var(--text)">50 KM</b>
+        Premium status povećava povjerenje prodavača i daje ti neograničene ponude svaki dan.<br>
+        Godišnja pretplata: <b style="color:var(--text)">${premCijena}</b>
       </div>
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.8">
-        <b style="color:var(--text)">Načini uplate:</b><br>
-        💳 <b style="color:var(--text)">Virman / Uplata:</b><br>
-        &nbsp;&nbsp;Berza Katalizatora d.o.o.<br>
-        &nbsp;&nbsp;IBAN: <b style="color:var(--text)">BA39 1234 5678 9012 3456</b><br>
-        &nbsp;&nbsp;Svrha: <b style="color:var(--text)">Premium – ${u.email}</b><br><br>
-        ₿ <b style="color:var(--text)">Crypto (USDT TRC20):</b><br>
-        &nbsp;&nbsp;<span style="word-break:break-all;color:var(--text);font-size:11px">TRx9Kdemo...wallet</span><br>
-        &nbsp;&nbsp;Pošalji potvrdu na: <b style="color:var(--text)">admin@berza.ba</b>
-      </div>
-      <div style="background:var(--yL);border:1px solid rgba(244,196,48,.2);border-radius:6px;padding:9px 12px;font-size:12px;color:var(--yellow)">
-        ⚠️ Nakon uplate pošalji potvrdu na admin@berza.ba — aktivacija unutar 24h.
+      <div style="background:var(--panel);border:1px solid rgba(244,119,46,.2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Za aktivaciju Premium naloga, kontaktirajte nas:</div>
+        <a href="mailto:berzakatalizatora@gmail.com" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--orange);text-decoration:none">✉️ berzakatalizatora@gmail.com</a>
       </div>
     </div>` : (u.role === 'buyer' && u.premium) ? `
     <div class="divider"></div>
@@ -1608,10 +1679,10 @@ function openProfil() {
     </div>
     <div class="divider"></div>
     <div class="row2">
-      <div class="fg"><label>Ime / Naziv</label><input id="p-name" value="${u.name||''}"></div>
+      <div class="fg"><label>${u.entity==='firma'?'Naziv firme':'Korisničko ime'} <span style="color:var(--muted);font-weight:400">(ne može se mijenjati)</span></label><input value="${escapeHtml(u.name)||''}" disabled style="opacity:.6;cursor:not-allowed"></div>
       <div class="fg"><label>Grad</label>
         <div class="ac-wrap">
-          <input id="p-city" value="${u.city||''}" placeholder="Upiši grad..." autocomplete="off">
+          <input id="p-city" value="${escapeHtml(u.city)||''}" placeholder="Upiši grad..." autocomplete="off">
           <div class="ac-list" id="ac-p-city"></div>
         </div>
       </div>
@@ -1643,6 +1714,7 @@ function openProfil() {
     ${premiumBlock}
   `;
   document.getElementById('ov-profil').classList.add('on');
+  _pushBack(() => closeOv('ov-profil'));
   // Dodaj privremeni country select za profil AC
   setTimeout(() => {
     if (!document.getElementById('p-country-hidden')) {
@@ -1657,18 +1729,29 @@ function openProfil() {
     initAC('p-city', 'p-country-hidden');
   }, 50);
 }
-function saveProfile() {
-  CU.name=document.getElementById('p-name').value.trim()||CU.name;
-  CU.city=document.getElementById('p-city').value.trim();
-  CU.addr=document.getElementById('p-addr').value.trim();
-  CU.tel =document.getElementById('p-tel').value.trim();
-  const dEl=document.getElementById('p-default-dani');
-  if (dEl) { CU.defaultDana=parseInt(dEl.value)||3; defaultDana=CU.defaultDana; }
-  // CU je ažuriran direktno — getBuyerAddr(CU) će automatski koristiti nove podatke
-  document.getElementById('uc-av').textContent=initials(CU.name);
-  document.getElementById('uc-name').textContent=CU.name;
+async function saveProfile() {
+  const city = document.getElementById('p-city').value.trim();
+  const addr = document.getElementById('p-addr').value.trim();
+  const tel  = document.getElementById('p-tel').value.trim();
+  const dEl  = document.getElementById('p-default-dani');
+  const default_dana = dEl ? (parseInt(dEl.value) || 3) : (CU.defaultDana || 3);
+
+  try {
+    const updated = await api('PUT', '/auth/profile', { name: CU.name, city, addr, tel, default_dana });
+    // Merge povratnih podataka u CU (čuva fullname, entity, email_notify itd.)
+    Object.assign(CU, updated);
+    CU.defaultDana = updated.default_dana || default_dana;
+    defaultDana = CU.defaultDana;
+  } catch(e) {
+    // Fallback: ažuriraj lokalno ako API ne uspije
+    CU.city = city; CU.addr = addr; CU.tel = tel;
+    CU.defaultDana = default_dana; defaultDana = default_dana;
+  }
+
+  document.getElementById('uc-av').textContent = initials(CU.name);
+  document.getElementById('uc-name').textContent = CU.name;
   closeOv('ov-profil');
-  toast('✅ Profil ažuriran','ok');
+  toast('✅ Profil ažuriran', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1807,7 +1890,18 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.admin-dd')) closeAdminDD();
 });
 
-function openPremiumInfo() { document.getElementById('ov-premium').classList.add('on'); }
+function openPremiumInfo() {
+  // Cijene po zemlji korisnika
+  const rs = CU && String(CU.country).toUpperCase() === 'RS';
+  const m = document.getElementById('prem-price-month');
+  const y = document.getElementById('prem-price-year');
+  if (m) m.innerHTML = rs
+    ? '60 <small style="font-size:16px;font-weight:400;color:var(--muted)">EUR / godišnje</small>'
+    : '120 <small style="font-size:16px;font-weight:400;color:var(--muted)">KM / godišnje</small>';
+  if (y) y.textContent = rs ? '(5 EUR / mjesec)' : '(10 KM / mjesec)';
+  document.getElementById('ov-premium').classList.add('on');
+  _pushBack(() => closeOv('ov-premium'));
+}
 
 async function admSetPremium(uid, val) {
   try {
@@ -1917,7 +2011,7 @@ async function toggleUserDetail(uid) {
           <div style="font-size:11px;color:var(--muted)">Poslano: ${fmtDate(new Date(p.created_at).getTime())}${respondDate}</div>
           <span style="font-size:10px;color:${stColor}">${stLabel}</span>
         </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} KM</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green)">${p.cijena} ${curr(p.country)}</div>
       </div>`;
     }).join(''):
     '<div style="font-size:12px;color:var(--muted)">Nema ponuda</div>';
@@ -2011,10 +2105,11 @@ async function renderAnalitika() {
   const el = document.getElementById('a-analitika');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Učitavam...</div>';
   try {
-    const [users, listings, ponude] = await Promise.all([
+    const [users, listings, ponude, topUsers] = await Promise.all([
       api('GET', '/admin/users'),
       api('GET', '/listings'),
-      api('GET', '/admin/ponude').catch(() => [])
+      api('GET', '/admin/ponude').catch(() => []),
+      api('GET', '/admin/top-users').catch(() => ({ sellers: [], buyers: [] }))
     ]);
 
     const sellers   = users.filter(u => u.role === 'seller');
@@ -2141,7 +2236,29 @@ async function renderAnalitika() {
         ${premiumExpiringSoon.length ? row('Premium ističe za 30 dana', premiumExpiringSoon.length, 'var(--yellow)') : ''}
         ${row('Prodavači ukupno', sellers.length)}
         ${row('Ukupno korisnika', users.filter(u=>u.role!=='admin').length)}
-      `)}</div>`;
+      `)}
+
+      ${topUsers.sellers && topUsers.sellers.length ? section('🏆 Top 10 prodavača', topUsers.sellers.map((u, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
+            <div style="font-size:11px;color:var(--muted)">${u.total_listings} oglasa · ${u.sales} prodaja${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--green);flex-shrink:0">${parseFloat(u.revenue).toLocaleString('de-DE')} ${curr(u.country)}</div>
+        </div>
+      `).join('')) : ''}
+
+      ${topUsers.buyers && topUsers.buyers.length ? section('🏆 Top 10 otkupljivača', topUsers.buyers.map((u, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:${i===0?'var(--yellow)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)'};width:24px;text-align:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(u.name)} <span style="font-size:11px;color:var(--muted)">📍 ${escapeHtml(u.city)||'—'}</span></div>
+            <div style="font-size:11px;color:var(--muted)">${u.total_ponude} ponuda · ${u.accepted} otkupa${u.avg_rating ? ' · ⭐ '+u.avg_rating+' ('+u.rating_count+')' : ''}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);flex-shrink:0">${parseFloat(u.spent).toLocaleString('de-DE')} ${curr(u.country)}</div>
+        </div>
+      `).join('')) : ''}</div>`;
   } catch(e) {
     console.error(e);
     el.innerHTML = '<div class="empty"><p>Greška pri učitavanju analitike.</p></div>';
@@ -2174,7 +2291,7 @@ async function admToggleOglas(id) {
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${isRej?.6:1}">
               <span style="font-size:12px">${badge}</span>
               <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(p.buyer_name)} <span style="color:var(--muted)">(${escapeHtml(p.buyer_city)||"—"})</span></span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} KM</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${col}">${p.cijena} ${curr(p.listing_country)}</span>
               <span style="font-size:10px;color:var(--muted)">${p.dani}d</span>
             </div>`;
           }).join('');
@@ -2206,7 +2323,7 @@ async function renderAdminOglasi() {
     const stStyle = l.status==='sent' ? 'background:rgba(41,128,185,.15);color:#5dade2;border:1px solid rgba(41,128,185,.3)' : '';
     return `<div class="admin-oglas-card" id="ac-l-${l.id}">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer" onclick="admToggleOglas(${l.id})">
-        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'🪙')}</div>
+        <div class="s-oglas-thumb" style="width:42px;height:42px;font-size:18px;flex-shrink:0">${l.thumb?`<img src="${l.thumb}">`:(isLot?'📦':'♻️')}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">
             ${isLot?`<span style="background:var(--orange);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin-right:4px">LOT</span>`:''}${escapeHtml(l.marka)} ${escapeHtml(l.model)}${l.god?' ('+escapeHtml(String(l.god))+')':''}
@@ -2222,9 +2339,9 @@ async function renderAdminOglasi() {
           ${!isLot?`<b>Stanje:</b> ${l.stanje||'—'}<br>`:''}
           <b>Objavio:</b> ${l.owner_name||'—'} (${l.owner_city||'—'}) · ${l.owner_tel||'—'}<br>
           ${l.accepted_buyer_name ? `<b style="color:var(--green)">Kupac:</b> ${escapeHtml(l.accepted_buyer_name)} (${escapeHtml(l.accepted_buyer_city)||"—"})<br>` : ''}
-          ${l.sold_at ? `<b>Prodano:</b> ${new Date(l.sold_at).toLocaleDateString('bs')}<br>` : ''}
+          ${l.sold_at ? `<b>Prodano:</b> ${fmtDate(new Date(l.sold_at).getTime())}<br>` : ''}
           ${l.nap?`<b>Napomena:</b> ${escapeHtml(l.nap)}<br>`:''}
-          <b>Datum:</b> ${new Date(l.created_at||Date.now()).toLocaleDateString('bs')}
+          <b>Objavljeno:</b> ${fmtDate(new Date(l.created_at||Date.now()).getTime())}
         </div>
         ${parseInt(l.ponuda_count) > 0 ? `
           <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
@@ -2273,7 +2390,7 @@ function addLotRow() {
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
   row.innerHTML = `
     <div style="width:22px;height:22px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0">${count+1}</div>
-    <input placeholder="OEM broj (opcija)" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
+    <input placeholder="OEM broj *" style="flex:1;background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 10px;font-family:Barlow,sans-serif;font-size:13px" class="lot-broj">
     <select style="background:var(--dark);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:7px 8px;font-family:Barlow,sans-serif;font-size:12px;flex-shrink:0" class="lot-stanje">
       <option value="Originalni — neoštećen" selected>Originalni</option>
       <option value="Malo oštećen">Malo oštećen</option>
@@ -2326,13 +2443,9 @@ function openNoviOglas() {
   // Reset lot
   const lotRows = document.getElementById('lot-rows');
   if (lotRows) lotRows.innerHTML = '';
-  document.getElementById('form-single').style.display = '';
-  document.getElementById('form-lot').style.display = 'none';
-  document.getElementById('tog-single').className = 'btn btn-primary btn-sm';
-  document.getElementById('tog-lot').className = 'btn btn-ghost btn-sm';
-  document.getElementById('tog-single').style.flex = '1';
-  document.getElementById('tog-lot').style.flex = '1';
   document.getElementById('ov-novi').classList.add('on');
+  _pushBack(() => closeOv('ov-novi'));
+  setListingType('single');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2475,6 +2588,7 @@ async function loadChatMsgsWithBuyer(lid, buyerId) {
       from: String(m.sender_id) === String(sellerUid) ? 'seller' : 'buyer',
       msg: m.text || '',
       imgUrl: m.image_url || null,
+      ts: m.created_at ? new Date(m.created_at).getTime() : null,
       time: new Date(m.created_at).toLocaleTimeString('bs',{hour:'2-digit',minute:'2-digit'})
     }));
     chatHistory[lid]._buyerId = buyerId;
