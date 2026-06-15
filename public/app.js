@@ -2389,13 +2389,8 @@ function openNoviOglas() {
   // Reset lot
   const lotRows = document.getElementById('lot-rows');
   if (lotRows) lotRows.innerHTML = '';
-  document.getElementById('form-single').style.display = '';
-  document.getElementById('form-lot').style.display = 'none';
-  document.getElementById('tog-single').className = 'btn btn-primary btn-sm';
-  document.getElementById('tog-lot').className = 'btn btn-ghost btn-sm';
-  document.getElementById('tog-single').style.flex = '1';
-  document.getElementById('tog-lot').style.flex = '1';
   document.getElementById('ov-novi').classList.add('on');
+  setListingType('single');
 }
 
 // ═══════════════════════════════════════════════════════
