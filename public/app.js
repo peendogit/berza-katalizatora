@@ -1514,15 +1514,14 @@ let _lbScale = 1;
 const _lbCache = {}; // URL -> Image objekt (preloaded)
 
 function _lbPreload(idx) {
-  // Preload trenutne + -1/+1
   [-1, 0, 1].forEach(offset => {
     const i = (idx + offset + _lbGallery.length) % _lbGallery.length;
     const url = _lbGallery[i];
-    if (url && !_lbCache[url]) {
-      const pre = new Image();
-      pre.src = url;
-      _lbCache[url] = pre;
-    }
+    if (!url || _lbCache[url]) return;
+    const pre = new Image();
+    pre.src = url;
+    if (pre.decode) pre.decode().catch(() => {});
+    _lbCache[url] = pre;
   });
 }
 
@@ -1543,21 +1542,27 @@ function lbNav(dir) {
   _lbScale = 1;
   const newSrc = _lbGallery[_lbIdx];
   const img = document.getElementById('lightbox-img');
-  if (!img) return;
+  if (!img) { _lbUpdateUI(); return; }
   img.style.transform = 'scale(1)';
   img.classList.remove('zoomed');
 
-  const cached = _lbCache[newSrc];
-  if (cached && cached.complete && cached.naturalWidth > 0) {
-    // Slika je već u cache — instantno, bez blica
-    img.src = newSrc;
+  // Preload u Image objekt pa decode() - tek onda swap src
+  // Na ovaj način stara slika ostaje vidljiva dok nova nije 100% sprema za prikaz
+  const pre = _lbCache[newSrc] || new Image();
+  _lbCache[newSrc] = pre;
+  const doSwap = () => { img.src = newSrc; };
+  if (pre.complete && pre.naturalWidth > 0) {
+    // Već dekodirana - instantno
+    doSwap();
   } else {
-    // Nije u cache — učitaj u pozadini, prikaži kad je gotovo
-    img.style.opacity = '0.4';
-    const pre = _lbCache[newSrc] || new Image();
-    _lbCache[newSrc] = pre;
-    pre.onload = () => { img.src = newSrc; img.style.opacity = '1'; };
-    pre.onerror = () => { img.src = newSrc; img.style.opacity = '1'; };
+    pre.onload = () => {
+      if (pre.decode) {
+        pre.decode().then(doSwap).catch(doSwap);
+      } else {
+        doSwap();
+      }
+    };
+    pre.onerror = doSwap;
     if (!pre.src) pre.src = newSrc;
   }
 
