@@ -148,7 +148,7 @@ function showPage(id) {
 }
 
 function showLoginPage()    { showPage('page-login'); }
-function showRegisterPage() { showPage('page-register'); setTimeout(() => initAC('reg-city', 'reg-country'), 50); }
+function showRegisterPage() { showPage('page-register'); pickRole(selRole||'seller'); setTimeout(() => initAC('reg-city', 'reg-country'), 50); }
 
 function goHome() {
   if (!CU) { showPage('page-hero'); return; }
