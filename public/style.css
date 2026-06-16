@@ -97,7 +97,7 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 
 /* Lightbox zoom na desktopu */
-#lightbox-img { cursor:zoom-in; transition:transform .2s ease; }
+#lightbox-img { cursor:zoom-in; transition:transform .2s ease, opacity .15s ease; }
 #lightbox-img.zoomed { cursor:zoom-out; transform:scale(1.9); transform-origin:center center; }
 @media (max-width:600px) { #lightbox-img.zoomed { transform:scale(1.4); } }
 
