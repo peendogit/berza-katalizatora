@@ -987,7 +987,7 @@ async function renderBuyerListings() {
     const imgs = l.images && l.images.length ? l.images : (l.thumb ? [l.thumb] : []);
     const thumbSrc = imgs[0] || null;
     const galleryJS = imgs.length ? 'openLightbox(this.src,[' + imgs.map(u=>`'${u}'`).join(',') + '])' : '';
-    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation();${galleryJS}"><img src="${thumbSrc}" loading="lazy"></div>` : `<div class="oglas-img">${isLot?'📦':'♻️'}</div>`;
+    const thumb = thumbSrc ? `<div class="oglas-img" style="cursor:zoom-in" onclick="event.stopPropagation()"><img src="${thumbSrc}" loading="lazy" onclick="${galleryJS}"></div>` : `<div class="oglas-img">${isLot?'📦':'♻️'}</div>`;
     const rem = 7 - Math.floor((Date.now() - l.createdAt) / 86400000);
     const expW = rem <= 3 && rem > 0 ? `<span class="badge b-wait">⚠️ Ističe za ${rem}d</span>` : '';
     const oglasBtnLabel = isLot ? `📤 Ponuda za lot` : `📤 Ponuda`;
