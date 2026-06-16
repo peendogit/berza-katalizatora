@@ -694,9 +694,12 @@ async function togglePP(lid) {
   const panel = document.getElementById('pp-'+lid);
   if (!panel) return;
   if (panel.style.display==='block') { panel.style.display='none'; return; }
+  panel.style.animation = 'none';
   try {
     panel.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:13px">Učitavam...</div>';
     panel.style.display = 'block';
+    panel.offsetHeight; // force reflow
+    panel.style.animation = '';
     const l = await api('GET', '/listings/'+lid);
     // Mapiraj ponude u format koji buildPonudeList očekuje
     l.ponude = (l.ponude||[]).map(p => ({

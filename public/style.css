@@ -172,6 +172,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 /* SELLER OGLAS CARD */
 .s-oglas-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;cursor:pointer;transition:border-color .18s;}
 .s-oglas-card:hover{border-color:var(--border2);}
+.ponude-panel { animation: ppSlideDown .22s cubic-bezier(.25,.46,.45,.94) both; }
+@keyframes ppSlideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
 .s-oglas-body{display:flex;gap:12px;align-items:flex-start;padding:14px;}
 #s-oglasi { padding-bottom: 90px; }
 #s-zavrseni { padding-bottom: 90px; }
