@@ -5,6 +5,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
+const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const { Pool } = require('pg');
@@ -658,6 +659,9 @@ app.post('/api/ponude', auth, async (req, res) => {
     if (!listing_id || !cijena || !dani) {
       return res.status(400).json({ error: 'Nedostaju podaci' });
     }
+    if (parseInt(dani) < 2) {
+      return res.status(400).json({ error: 'Minimalan period važenja ponude je 2 dana' });
+    }
 
     // Provjeri da oglas postoji i aktivan je
     const listing = await pool.query(
@@ -1128,7 +1132,7 @@ app.get('/api/admin/top-users', auth, adminOnly, async (req, res) => {
 // UPLOAD ROUTE
 // ═══════════════════════════════════════════════════════════
 app.post('/api/upload', auth, (req, res, next) => {
-  upload.array('images', 50)(req, res, err => {
+  upload.array('images', 50)(req, res, async err => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Slika je prevelika (max 5MB po slici)' });
@@ -1138,8 +1142,28 @@ app.post('/api/upload', auth, (req, res, next) => {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'Nije uploadovana nijedna slika' });
     }
-    const urls = req.files.map(f => `/uploads/${f.filename}`);
-    res.json({ urls });
+    try {
+      const urls = [];
+      for (const f of req.files) {
+        const fullPath = f.path;
+        // Resize u mjestu na max 1600px širine — uklanja ogromne foto-iz-mobitela
+        // (3000-4000px) koje uzrokuju spori decode na slabijim telefonima (vidljiv "flash"
+        // pri otvaranju lightboxa). JPEG kvalitet 82 — vizuelno bez gubitka, fajl ~5-10x manji.
+        await sharp(fullPath)
+          .rotate() // poštuje EXIF orijentaciju (česti problem sa telefon fotkama)
+          .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 82, mozjpeg: true })
+          .toFile(fullPath + '.tmp');
+        fs.renameSync(fullPath + '.tmp', fullPath);
+        urls.push(`/uploads/${f.filename}`);
+      }
+      res.json({ urls });
+    } catch (e) {
+      console.error('Image resize error:', e.message);
+      // Fallback — vrati originalne fajlove ako resize ne uspije (ne blokiraj upload)
+      const urls = req.files.map(f => `/uploads/${f.filename}`);
+      res.json({ urls });
+    }
   });
 });
 
