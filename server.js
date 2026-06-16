@@ -107,7 +107,13 @@ async function notifyUser(userId, subject, html) {
 
 // Static files (frontend + uploads)
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '30d',
+  immutable: true,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+  }
+}));
 
 // ─── Multer (upload slika) ────────────────────────────────
 const storage = multer.diskStorage({
