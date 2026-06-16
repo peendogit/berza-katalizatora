@@ -426,7 +426,7 @@
 <div class="lightbox" id="lightbox">
   <button onclick="closeLightbox()" style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:24px;width:40px;height:40px;border-radius:50%;cursor:pointer;z-index:510;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
   <button id="lb-prev" onclick="lbNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.6);border:none;color:#fff;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer;z-index:510;display:none;align-items:center;justify-content:center">‹</button>
-  <img id="lightbox-img" src="" style="max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6);cursor:default" onclick="event.stopPropagation()">
+  <img id="lightbox-img" loading="eager" decoding="sync" style="max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6);cursor:default" onclick="event.stopPropagation()">
   <button id="lb-next" onclick="lbNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.6);border:none;color:#fff;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer;z-index:510;display:none;align-items:center;justify-content:center">›</button>
   <div id="lb-counter" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);color:#fff;font-size:13px;padding:4px 12px;border-radius:20px;display:none"></div>
 </div>
