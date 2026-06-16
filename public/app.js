@@ -1558,13 +1558,7 @@ function lbNav(dir) {
   // Na ovaj način stara slika ostaje vidljiva dok nova nije 100% sprema za prikaz
   const pre = _lbCache[newSrc] || new Image();
   _lbCache[newSrc] = pre;
-  const doSwap = () => {
-    img.style.opacity = '0';
-    setTimeout(() => {
-      img.src = newSrc;
-      img.style.opacity = '1';
-    }, 100);
-  };
+  const doSwap = () => { img.src = newSrc; };
   if (pre.complete && pre.naturalWidth > 0) {
     // Već dekodirana - instantno
     doSwap();
