@@ -353,8 +353,8 @@ header{background:rgba(8,9,10,.95);backdrop-filter:blur(12px);border-bottom:1px 
 .bubble-img { max-width:220px; max-height:180px; border-radius:10px; display:block; margin-top:4px; cursor:pointer; }
 .bubble-img:hover { opacity:.9; }
 /* Lightbox */
-.lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:500; align-items:center; justify-content:center; cursor:pointer; }
-.lightbox.on { display:flex; }
+.lightbox { display:flex; visibility:hidden; opacity:0; pointer-events:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:500; align-items:center; justify-content:center; cursor:pointer; transition:opacity .12s ease; }
+.lightbox.on { visibility:visible; opacity:1; pointer-events:auto; }
 .lightbox img { max-width:92vw; max-height:88vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,.6); }
 
 /* AUTOCOMPLETE */

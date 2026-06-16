@@ -1495,40 +1495,11 @@ function openLightbox(src, gallery) {
   if (_lbIdx < 0) _lbIdx = 0;
   _lbScale = 1;
   const img = document.getElementById('lightbox-img');
-  if (img) { img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
-
-  const showOverlay = () => {
-    if (img) img.src = src;
-    _lbUpdateUI();
-    _lbPreload(_lbIdx);
-    // src je postavljen dok je .lightbox još display:none (siguran trenutak za browser
-    // da povezuje već-dekodiran pixel buffer). Sačekaj jedan frame pa prikaži overlay
-    // da izbjegnemo "broken image" placeholder flash pri display:none -> flex tranziciji.
-    requestAnimationFrame(() => {
-      document.getElementById('lightbox').classList.add('on');
-      _pushBack(() => closeLightbox());
-    });
-  };
-
-  // Provjeri da li je slika već dekodirana (npr. isti URL kao thumbnail, vrlo vjerovatno u cache-u)
-  const cached = _lbCache[src];
-  if (cached && cached.complete && cached.naturalWidth > 0) {
-    showOverlay();
-  } else {
-    const pre = cached || new Image();
-    _lbCache[src] = pre;
-    const ready = () => {
-      if (pre.decode) pre.decode().then(showOverlay).catch(showOverlay);
-      else showOverlay();
-    };
-    if (pre.complete && pre.naturalWidth > 0) {
-      ready();
-    } else {
-      pre.onload = ready;
-      pre.onerror = showOverlay;
-      if (!pre.src) pre.src = src;
-    }
-  }
+  if (img) { img.src = src; img.style.transform = 'scale(1)'; img.classList.remove('zoomed'); }
+  _lbUpdateUI();
+  _lbPreload(_lbIdx);
+  document.getElementById('lightbox').classList.add('on');
+  _pushBack(() => closeLightbox());
 }
 
 function closeLightbox() {
@@ -1538,6 +1509,16 @@ function closeLightbox() {
   _lbGallery = []; _lbIdx = 0; _lbScale = 1;
   const img = document.getElementById('lightbox-img');
   if (img) { img.classList.remove('zoomed'); img.style.transform = 'scale(1)'; }
+  // Skini ovaj overlay sa back-stacka ako je još tu (zatvoreno klikom na X/pozadinu,
+  // ne preko fizičkog back dugmeta) — inače stack postaje neusklađen sa history.state
+  // i sljedeći back-gesture/otvaranje overlaya se slomi.
+  const idx = _backStack.lastIndexOf(closeLightbox);
+  if (idx !== -1) {
+    _backStack.splice(idx, 1);
+    if (history.state && history.state.backStack > _backStack.length) {
+      history.back();
+    }
+  }
 }
 
 function _lbPreload(idx) {
