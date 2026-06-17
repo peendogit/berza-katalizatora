@@ -747,7 +747,7 @@ function buildPonudeList(l) {
           </div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:${isAcc?'var(--green)':isDec?'var(--muted)':'var(--orange2)'};flex-shrink:0">${p.cijena} ${lcurr(l)}</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">ističe ${(() => { const rem = Math.ceil((p.expiresAt - Date.now()) / 86400000); return rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'; })()}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${buyerCity} · ${p.time}${p.dani ? ` · ⏱️ ${p.dani}d` : ''}${p.expiresAt ? ` · <span style="color:${p.expiresAt - Date.now() < 0 ? 'var(--muted)' : p.expiresAt - Date.now() < 86400000 ? 'var(--red)' : p.expiresAt - Date.now() < 2*86400000 ? 'var(--yellow)' : 'var(--muted)'}">${(() => { const remMs = p.expiresAt - Date.now(); if (remMs < 0) return 'istekla'; const rem = Math.ceil(remMs / 86400000); return 'ističe ' + (rem <= 0 ? 'danas' : rem === 1 ? 'sutra' : 'za ' + rem + ' dana'); })()}</span>` : ''}</div>
         ${telB}${msgB}
         ${acts ? `<div style="display:flex;gap:6px;margin-top:8px">${acts}</div>` : ''}
       </div>
