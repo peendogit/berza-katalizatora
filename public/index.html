@@ -220,10 +220,16 @@
     </nav>
     </div>
     <div class="tab-pane on" id="ap-users">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-xs" id="af-all"     onclick="setAdminFilter('all')">Svi</button>
+        <button class="btn btn-ghost btn-xs"   id="af-seller"  onclick="setAdminFilter('seller')">Prodavači</button>
+        <button class="btn btn-ghost btn-xs"   id="af-buyer"   onclick="setAdminFilter('buyer')">Otkupljivači</button>
+        <button class="btn btn-ghost btn-xs"   id="af-pending" onclick="setAdminFilter('pending')" style="border-color:var(--yellow);color:var(--yellow)">Na čekanju</button>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-xs" id="af-all"    onclick="setAdminFilter('all')">Svi</button>
-        <button class="btn btn-ghost btn-xs"   id="af-seller" onclick="setAdminFilter('seller')">Prodavači</button>
-        <button class="btn btn-ghost btn-xs"   id="af-buyer"  onclick="setAdminFilter('buyer')">Otkupljivači</button>
+        <button class="btn btn-primary btn-xs" id="afc-all" onclick="setAdminCountry('all')">Sve zemlje</button>
+        <button class="btn btn-ghost btn-xs"   id="afc-BA"  onclick="setAdminCountry('BA')">🇧🇦 BiH</button>
+        <button class="btn btn-ghost btn-xs"   id="afc-RS"  onclick="setAdminCountry('RS')">🇷🇸 Srbija</button>
       </div>
       <div class="fg" style="margin-bottom:12px"><input id="admin-search" placeholder="🔍 Pretraži (ime, email, grad)..." oninput="renderAdminUsers()"></div>
       <div id="a-users"></div>
@@ -378,6 +384,7 @@
       </div>
       <div class="fg"><label>Ponuda vrijedi</label>
         <select id="pon-dani">
+          <option value="1">1 dan</option>
           <option value="2">2 dana</option>
           <option value="3" selected>3 dana</option>
           <option value="4">4 dana</option>
